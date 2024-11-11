@@ -1,34 +1,35 @@
-const { DataTypes } = require('sequelize');
-// const sequelize = new Sequelize('postgres://user:pass@example.com:5432/dbname') 
-
-const Token = sequelize.define(
-  'Token',
-  {
-    tokenID: {
-        type: DataTypes.INTEGER,
-        allowNull: false,
-        autoIncrement: true,
-        primaryKey: true
-    },
-    access_token: {
-        type: DataTypes.STRING,
-        allowNull: false,
-        unique: true, // Ensure the access_token is unique
-    },
-    refresh_token: {
-        type: DataTypes.STRING,
-        allowNull: false,
-        unique: true, // Ensure the refresh_token is unique
-    },
-    expires_at: {
-        type: DataTypes.DATE,
-        allowNull: false,
-        },
-    }, {
-
-    });
-
-Token.belongsTo(Client, {
-    foreignKey: 'clientID', // Reference to client_id from Client model
-    as: 'client', // Alias to reference the associated client
-});
+'use strict';
+const {
+  Model
+} = require('sequelize');
+module.exports = (sequelize, DataTypes) => {
+  class Token extends Model {
+    /**
+     * Helper method for defining associations.
+     * This method is not a part of Sequelize lifecycle.
+     * The `models/index` file will call this method automatically.
+     */
+    static associate(models) {
+        Token.belongsTo(User, {
+            foreignKey: 'userID', 
+            as: 'user',           
+          });
+        Token.belongsTo(User, {
+            foreignKey: 'clientID', 
+            as: 'client',           
+          });
+    }
+  }
+  Token.init({
+    tokenID: DataTypes.INTEGER,
+    access_token: DataTypes.STRING,
+    refresh_token: DataTypes.STRING,
+    expires_at: DataTypes.DATE,
+    clientID: DataTypes.INTEGER,
+    userID: DataTypes.INTEGER,
+  }, {
+    sequelize,
+    modelName: 'Token',
+  });
+  return Token;
+};

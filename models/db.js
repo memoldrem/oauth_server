@@ -37,6 +37,16 @@ Object.keys(db).forEach(modelName => {
   }
 });
 
+
+sequelize.sync()
+  .then(() => {
+    console.log("User model synced with database!");
+  })
+  .catch((err) => {
+    console.error("Error syncing the model:", err);
+  });
+
+
 db.sequelize = sequelize;
 db.Sequelize = Sequelize;
 
