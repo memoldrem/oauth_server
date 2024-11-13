@@ -2,13 +2,13 @@
 const express = require('express');
 const app = express();
 const port = 3000;
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs'); // we made it bcrypt js
 const passport = require('passport');
 const flash = require('express-flash');
 const session = require('express-session');
 require('dotenv').config(); // if statement for production mode?
 
-const initializePassport = require('./passport-config')
+const initializePassport = require('./config/passport-config')
 initializePassport(passport, //*user email, user id*
   // find user thru email in database!!!! need arg
   // also pass in user id

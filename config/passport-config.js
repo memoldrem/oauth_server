@@ -1,5 +1,5 @@
 const LocalStrategy = require('passport-local').Strategy
-const bcrypt = require('bcrypt')
+const bcrypt = require('bcryptjs')
 
 function initializePassport(passport, getUserByEmail, getUserByID){
     const authenticateUser = async (email, password, done) => { // is it really async??
