@@ -15,8 +15,8 @@ initializePassport(passport, //*user email, user id*
   )
 
 app.set('view engine', 'ejs');
-app.use(express.urlencoded({extended: false}))
-app.use(flash)
+app.use(express.urlencoded({extended: false}));
+app.use(flash());
 app.use(session({
   secret: process.env.SESSION_SECRET,
   resave: false,
@@ -25,21 +25,19 @@ app.use(session({
 app.use(passport.initialize())
 app.use(passport.session())
 
-app.get('/', checkAuthenticated, (req, res) => {
-  res.render('index.ejs')
-})
 
-app.get('/login', (req, res) => {
+// Login pages
+app.get('/', (req, res) => {
   res.render('login.ejs')
 })
 
-app.post('/login', passport.authenticate({
-  successRedirect: '/',
-  failureRedirect: '/login',
+app.post('/', passport.authenticate({
+  successRedirect: '/dashboard',
+  failureRedirect: '/',
   failureFlash: true,
-
 }))
 
+// Register pages
 app.get('/register', (req, res) => {
   res.render('register.ejs')
 })
@@ -54,8 +52,13 @@ app.post('/register', async (req, res) => {
   }
 })
 
+// Success pages
+app.get('/dashboard', checkAuthenticated, (req, res) => {
+  res.render('dashboard.ejs')
+})
 
-function checkAuthenticated(req, res, next){
+
+function checkAuthenticated(req, res, next){ // middleware to check authentication!
   if(req.isAuthenticated()){
     return next();
   }
