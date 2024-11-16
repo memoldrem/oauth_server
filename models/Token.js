@@ -10,11 +10,7 @@ module.exports = (sequelize, DataTypes) => {
      * The `models/index` file will call this method automatically.
      */
     static associate(models) {
-        Token.belongsTo(User, {
-            foreignKey: 'userID', 
-            as: 'user',           
-          });
-        Token.belongsTo(User, {
+        Token.belongsTo(models.Client, {
             foreignKey: 'clientID', 
             as: 'client',           
           });
