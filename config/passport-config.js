@@ -1,34 +1,55 @@
-const LocalStrategy = require('passport-local').Strategy
-const bcrypt = require('bcryptjs')
-const { getUserByEmail, getUserByID } = require('../utils/userUtils'); 
+const LocalStrategy = require('passport-local').Strategy;
+const bcrypt = require('bcryptjs');
+const { getUserByEmail, getUserByID } = require('../utils/userUtils'); // Assuming utils folder is correctly structured
 
-function initializePassport(passport){
+function initializePassport(passport) {
     const authenticateUser = async (email, password, done) => {
-        const user = await getUserByEmail(email) // use database???
-        if(user == null){
-            return done(null, false, {message: "No user with that email"});
-        }
-
         try {
-            if(await bcrypt.compare(password, user.password)){
-                return done(null, user)
-            } else {
-                return done(null, false, {message: "Password is incorrect"})
+            const user = await getUserByEmail(email); // Querying the database
+
+            if (!user) {
+                return done(null, false, { message: "No user with that email" });
             }
-        } catch(e) {
-            done(e)
+
+            console.log('Password:', password);
+            console.log("Password from DB:", user.passwordHash);
+
+            // Comparing the hashed password with the input password
+            if (await bcrypt.compare(password, user.passwordHash)) {
+                return done(null, user);
+            } else {
+                return done(null, false, { message: "Password is incorrect" });
+            }
+        } catch (err) {
+            console.error('Error during authentication:', err);
+            return done(err);
         }
+    };
 
-    }
-    passport.use(new LocalStrategy({ usernameField: 'email' }, authenticateUser));// looks for email instead of default user
-    console.log("Registered Passport Strategies:", passport._strategies);
-    passport.serializeUser((user, done) => done(null, user.id))
-    passport.deserializeUser((id, done) => { 
-        const userByID = getUserByID(id);
-        return done(null, userByID)
-    })
+    passport.use(new LocalStrategy({ usernameField: 'email' }, authenticateUser)); // Customizing username field to 'email'
+
+    passport.serializeUser((user, done) => {
+        // Ensure user and user.id exist before proceeding
+        if (!user) {
+            return done(new Error("User is missing"));
+        } else if (!user.userID) {
+            return done(new Error("User ID is missing"));
+        }
+        return done(null, user.userID); // Only store user ID in session
+    });
+
+    passport.deserializeUser(async (userID, done) => {
+        try {
+            const user = await getUserByID(userID); // Await the asynchronous getUserByID call
+            if (!user) {
+                return done(new Error("User not found"));
+            }
+            return done(null, user); // Return the full user object after retrieving it
+        } catch (err) {
+            console.error('Error deserializing user:', err);
+            return done(err); // Handle any errors during deserialization
+        }
+    });
 }
-
-  
 
 module.exports = initializePassport;

@@ -13,12 +13,8 @@ const User = db.User;
 
 
 // const authenticate = require('./middleware/authenticate'); // Custom middleware for protected routes
-
 dotenv.config();
-
 const app = express();
-const port = 3000;
-
 
 initializePassport(passport); // might need other arguments!
 
