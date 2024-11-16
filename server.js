@@ -4,6 +4,7 @@ const passport = require('passport');
 const flash = require('express-flash');
 const session = require('express-session');
 const dotenv = require('dotenv');
+const initializePassport = require('./config/passport-config')
 
 // const { OAuth2Server } = require('oauth2-server'); // OAuth2 server library
 const bodyParser = require('body-parser');
@@ -11,24 +12,21 @@ const db = require('./models');
 const User = db.User;
 
 
-// // const authenticate = require('./middleware/authenticate'); // Custom middleware for protected routes
+// const authenticate = require('./middleware/authenticate'); // Custom middleware for protected routes
 
 dotenv.config();
 
 const app = express();
 const port = 3000;
 
-// const initializePassport = require('./config/passport-config')
-// initializePassport(passport, //*user email, user id*
-//   // find user thru email in database!!!! need arg
-//   // also pass in user id
-//   )
+
+initializePassport(passport); // might need other arguments!
 
 app.set('view engine', 'ejs');
 app.use(bodyParser.json());
 app.use(express.urlencoded({extended: true})); // used to be false
 app.use(flash());
-app.use(session({
+app.use(session({ // middleware
   secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
@@ -46,12 +44,11 @@ app.get('/', (req, res) => {
   res.render('login.ejs')
 })
 
-// app.post('/', passport.authenticate({ 
-//   successRedirect: '/dashboard',  // redirect if login is successful
-//   failureRedirect: '/',         // redirect if login fails
-//   failureFlash: true,
-// }))
-
+app.post('/', passport.authenticate('local', { 
+  successRedirect: '/dashboard',  // redirect if login is successful
+  failureRedirect: '/',         // redirect if login fails
+  failureFlash: true,
+}))
 
 
 // Register pages
@@ -60,28 +57,24 @@ app.get('/register', (req, res) => {
 
 })
 
-app.post('/register', async (req, res) => {
+app.post('/register', async (req, res) => { // this functionality might need more testing
   try {
-
     const { username, email, password } = req.body;
-
     const existingUser = await User.findOne({
       where: { username: req.body.username }
     });
 
     if (existingUser) {
-      req.flash('error', 'User with this email already exists.'); // we could make this cleaner. lol
+      req.flash('error', 'User with this email already exists.'); // 
       return res.redirect('/register'); 
     } 
 
     const hashedPassword = await bcrypt.hash(password, 10)
-
     const newUser = await User.create({
       username,
       email,
       passwordHash: hashedPassword,
     });
-
 
     res.redirect('/')
   } catch(error) {
@@ -90,23 +83,18 @@ app.post('/register', async (req, res) => {
   }
 })
 
-// // // Success pages
-// // app.get('/dashboard', checkAuthenticated, (req, res) => {
-// //   res.render('dashboard.ejs')
-// // })
+// Success pages
+app.get('/dashboard', checkAuthenticated, (req, res) => {
+  res.render('dashboard.ejs')
+})
 
 
-// // function checkAuthenticated(req, res, next){ // middleware to check authentication!
-// //   if(req.isAuthenticated()){
-// //     return next();
-// //   }
-// //   res.redirect('/');
-// // }
-
-// app.listen(port, () => {
-//   console.log(`Server running at http://localhost:3000}`);
-// });
-
+function checkAuthenticated(req, res, next){ // middleware to check authentication!
+  if(req.isAuthenticated()){
+    return next();
+  }
+  res.redirect('/');
+}
 
 
 
@@ -187,15 +175,9 @@ app.post('/register', async (req, res) => {
 
 
 
-
+// Start the server after sync
 db.sequelize.sync({ force: false }) // Change to true if you want to reset tables (not recommended in production)
   .then(() => {
-    // console.log("Models synced with the database!");
-
-    // Log db.User to check if the User model is defined
-    // console.log(db.User);  // Check if db.User is defined
-
-    // Start the server after sync
     app.listen(3000, () => {
       console.log("Server is running on http://localhost:3000");
     });
@@ -203,3 +185,6 @@ db.sequelize.sync({ force: false }) // Change to true if you want to reset table
   .catch((err) => {
     console.error("Error syncing models:", err);
   });
+
+
+  
