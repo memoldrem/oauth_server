@@ -17,10 +17,30 @@ module.exports = (sequelize, DataTypes) => {
     }
   }
   Client.init({
-    clientID: DataTypes.INTEGER,
-    clientSecret: DataTypes.STRING,
-    redirectURI: DataTypes.STRING,
-    ownerID: DataTypes.INTEGER
+    clientID: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      autoIncrement: true, // Automatically increment clientID
+      primaryKey: true
+    },
+    clientSecret: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      validate: {
+        notEmpty: true,
+      }
+    },
+    redirectURI: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      validate: {
+        isUrl: true, // Ensure it's a valid URL
+      }
+    },
+    ownerID: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+    }
   }, {
     sequelize,
     modelName: 'Client',
