@@ -42,6 +42,18 @@ app.use(passport.initialize());
 app.use(passport.session());
 app.use(express.static('public'));
 
+app.get('/', (req, res) => {
+  const client_id = 1;  // Your fixed client ID
+  const redirect_uri = "https://your-client-app.com/callback";  // Your fixed redirect URI
+  const state = Math.random().toString(36).substring(7);  // Generate a random state for CSRF protection
+
+  // Create the login URL
+  const loginUrl = `/login?client_id=${client_id}&redirect_uri=${redirect_uri}&state=${state}`;
+  
+  // Redirect to login page
+  res.redirect(loginUrl);
+});
+
 
 // Registration 
 app.get('/register', (req, res) => { 
@@ -67,17 +79,22 @@ app.post('/register', async (req, res) => {
 });
 
 // Login
-app.get('/', (req, res) => {
-  res.render('login.ejs');
+app.get('/login', (req, res) => {
+  const { client_id, redirect_uri, state } = req.query;
+  // Render the login page, passing the client_id, redirect_uri, and state for use in the form
+  res.render('login', { client_id, redirect_uri, state });
 });
 
-app.post('/', passport.authenticate('local', {
-  successRedirect: '/dashboard',
-  failureRedirect: '/',
+app.post('/login', passport.authenticate('local', {
+  failureRedirect: '/login',
   failureFlash: true,
 }), (req, res) => {
   // Check if OAuth parameters are in the query
+  console.log(req.query); // Logs all query parameters
+
   const { client_id, redirect_uri, state } = req.query;
+  console.log(client_id);
+  console.log(redirect_uri);
 
   if (client_id && redirect_uri) {
     // If the user is logged in and OAuth parameters are present, redirect to authorize
@@ -85,7 +102,7 @@ app.post('/', passport.authenticate('local', {
   }
 
   // Otherwise, continue to the dashboard
-  res.redirect('/dashboard');
+  res.redirect('/login');
 });
 
 
@@ -97,32 +114,33 @@ app.post('/', passport.authenticate('local', {
 
 // authorize endpoint
 app.get('/authorize', async (req, res) => {
+  console.log('User authenticated:', req.isAuthenticated());
   const { response_type, client_id, redirect_uri, state } = req.query;
 
   try {
-    const client = await Client.findOne({ where: { clientId: client_id } });
-    if (!client || client.redirectUri !== redirect_uri) {
-      return res.status(400).json({ error: 'Invalid client or redirect URI' });
+    const client = await Client.findOne({ where: { clientID: client_id } });
+
+    if (client.redirectURI !== redirect_uri) {
+      return res.status(400).json({ error: 'Invalid redirect URI' });
     }
 
-    if (response_type !== 'code') {
-      return res.status(400).json({ error: 'Unsupported response type' });
-    }
+    // check response_type??
 
-    //my thinking is that they would only get to this step if they were autheorized
+    //my thinking is that they would only get to this step if they were authenticated
     if (!req.isAuthenticated()) {
       return res.redirect(
         `/login?client_id=${client_id}&redirect_uri=${redirect_uri}&state=${state}`
       );
     }
 
-    const code = oauthModel.generateAuthorizationCode(req.user, client);
-    await db.AuthorizationCode.create({
-      code,
-      userId: req.user.id,
-      clientId: client.id,
-      redirectUri,
-    });
+    // const code = oauthModel.generateAuthorizationCode(req.user, client);
+    const code = Math.random().toString(36).substring(7); 
+    // await db.AuthorizationCode.create({
+    //   code,
+    //   userId: req.user.id,
+    //   clientID: client.clientID,
+    //   redirectUri,
+    // });
 
     const redirectUrl = `${redirect_uri}?code=${code}${
       state ? `&state=${state}` : ''
@@ -137,19 +155,19 @@ app.get('/authorize', async (req, res) => {
 
 // OAuth2 Token Generation Endpoint (for issuing tokens)
 // Exchanges the authorization code for access and refresh tokens.
-app.post('/token', (req, res, next) => {
+app.post('/token', async (req, res, next) => {
   const { code, client_id, client_secret, redirect_uri } = req.body;
 
   try {
     // Fetch client from database
-    const client = Client.findOne({ where: { clientId: client_id } }); // await
+    const client = await Client.findOne({ where: { clientID: client_id } }); // await
     if (!client || client.clientSecret !== client_secret) {
       return res.status(400).json({ error: 'Invalid client credentials' });
     }
 
     // Verify that the authorization code exists and matches the client
-    const authCode = AuthorizationCode.findOne({ // await
-      where: { code, clientId: client.id, redirectUri: redirect_uri },
+    const authCode = await AuthorizationCode.findOne({ // await
+      where: { code, clientID: client.clientID, redirectUri: redirect_uri },
     });
 
     if (!authCode) {
@@ -157,7 +175,7 @@ app.post('/token', (req, res, next) => {
     }
 
     // Generate an OAuth access token (and optionally a refresh token)
-    const token = oauthModel.generateAccessToken(authCode.userId, client.id);
+    const token = oauthModel.generateAccessToken(authCode.userId, client.clientID);
 
     // Respond with the token
     res.json({
@@ -206,3 +224,31 @@ db.sequelize.sync({ force: false }).then(() => {
 }).catch((err) => {
   console.error("Error syncing models:", err);
 });
+
+
+const createStaticClient = async () => {
+  try {
+    // Check if the client already exists (using clientID)
+    const existingClient = await Client.findOne({
+      where: { clientID: 1 }
+    });
+
+    if (!existingClient) {
+      // If client doesn't exist, create it
+      const newClient = await Client.create({
+        clientID: 1,  // Fixed client ID
+        clientSecret: 'client-secret',  // Fixed secret
+        redirectURI: 'https://your-client-app.com/callback',  // Fixed redirect URI
+        ownerID: 1  // Reference to the owner (user ID)
+      });
+      console.log('Client created:', newClient);
+    } else {
+      console.log('Client already exists.');
+    }
+  } catch (error) {
+    console.error('Error creating client:', error);
+  }
+};
+
+// Call the function on app startup
+createStaticClient();

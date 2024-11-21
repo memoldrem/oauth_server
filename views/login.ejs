@@ -10,7 +10,7 @@
 
     <div class="login-container">
         <h1>Sign In</h1>
-        <form action="/" method="post" class="login-form">
+        <form action="/login?client_id=1&redirect_uri=https://your-client-app.com/callback&state=uom9p9" method="post" class="login-form">
             <% if (messages.error) { %>
                 <div class="alert alert-danger">
                     <% messages.error.forEach(msg => { %>

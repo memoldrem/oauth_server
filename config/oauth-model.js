@@ -2,8 +2,8 @@ const { User, OAuthToken } = require('../models'); // Sequelize models for User 
 
 module.exports = {
   // Retrieve a client based on client ID and secret
-  getClient: async (clientId, clientSecret) => {
-    const client = await db.Client.findOne({ where: { clientId } });
+  getClient: async (clientID, clientSecret) => {
+    const client = await db.Client.findOne({ where: { clientID } });
     if (!client) return null;
   
     // If client_secret is not needed, you can skip this check
@@ -12,7 +12,7 @@ module.exports = {
     }
   
     return {
-      id: client.clientId,
+      id: client.clientID,
       grants: client.grants, // e.g., ['authorization_code', 'refresh_token']
       redirectUris: [client.redirectUri],
     };
@@ -26,7 +26,7 @@ module.exports = {
         accessTokenExpiresAt: token.accessTokenExpiresAt,
         refreshToken: token.refreshToken,
         refreshTokenExpiresAt: token.refreshTokenExpiresAt,
-        clientId: client.id,
+        clientID: client.id,
         userId: user.id,
       });
 
@@ -125,6 +125,21 @@ module.exports = {
     }
   },
 
+
+  generateAuthorizationCode(user, client) {
+    // Combine user and client information into a unique string
+    const baseString = `${user.id}:${client.clientID}:${new Date().getTime()}`;
+    
+    // Generate a secure random string based on the base string
+    const hash = crypto.createHash('sha256');
+    hash.update(baseString);
+    const authorizationCode = hash.digest('hex'); // 64-character hex string
+
+    // Optionally, store the authorization code in a database with expiration time
+    // Example: Save to an 'AuthorizationCodes' model (not shown here)
+    return authorizationCode;
+  },
+  
   /**
    * Validate the authorization code.
    */
@@ -159,7 +174,7 @@ module.exports = {
         code: code.authorizationCode,
         expiresAt: code.expiresAt,
         redirectUri: code.redirectUri,
-        clientId: client.id,
+        clientID: client.id,
         userId: user.id,
       });
 

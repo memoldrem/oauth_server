@@ -1,5 +1,5 @@
 // /services/userService.js
-const db = require('../models');  // Assuming your Sequelize instance is in /models
+const db = require('../models');  
 
 // getUserByEmail - Finds user by email
 async function getUserByEmail(email) {
