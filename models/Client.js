@@ -33,9 +33,9 @@ module.exports = (sequelize, DataTypes) => {
     redirectURI: {
       type: DataTypes.STRING,
       allowNull: false,
-      validate: {
-        isUrl: true, // Ensure it's a valid URL
-      }
+      // validate: {
+      //   isUrl: true, // Ensure it's a valid URL
+      // }
     },
     ownerID: {
       type: DataTypes.INTEGER,

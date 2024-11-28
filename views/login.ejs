@@ -10,14 +10,11 @@
 
     <div class="login-container">
         <h1>Sign In</h1>
-        <form action="/login?client_id=1&redirect_uri=https://your-client-app.com/callback&state=uom9p9" method="post" class="login-form">
-            <% if (messages.error) { %>
-                <div class="alert alert-danger">
-                    <% messages.error.forEach(msg => { %>
-                        <p><%= msg %></p>
-                    <% }); %>
-                </div>
-            <% } %>
+        <form action="/login" method="post" class="login-form">
+            <input type="hidden" name="client_id" value="<%= client_id %>">
+            <input type="hidden" name="redirect_uri" value="<%= redirect_uri %>">
+            <input type="hidden" name="client_secret" value="<%= client_secret %>">
+            <input type="hidden" name="state" value="<%= state %>">
             <div>
                 <label for="email">Email</label>
                 <input id="email" name="email" type="text" autocomplete="email" required autofocus>

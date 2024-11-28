@@ -11,13 +11,6 @@
     <div class="login-container">
         <h1>Register</h1>
         <form action="/register" method="POST" class="login-form">
-            <% if (messages.error) { %>
-                <div class="alert alert-danger">
-                    <% messages.error.forEach(msg => { %>
-                        <p><%= msg %></p>
-                    <% }); %>
-                </div>
-            <% } %>
             <div>
                 <label for="email">Email</label>
                 <input id="email" name="email" type="text" required>

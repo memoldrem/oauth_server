@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OAuth Authorization</title>
+  
+</head>
+<body>
+  <div class="container">
+    <h1>Authorize Application</h1>
+    <p><strong>Client ID:</strong> <%= client_id %></p>
+    <p><strong>Redirect URI:</strong> <%= redirect_uri %></p>
+
+    <p>Do you want to grant access to this application?</p>
+    
+    <form action="/oauth/authorize" method="POST">
+      <input type="hidden" name="client_id" value="<%= client_id %>">
+      <input type="hidden" name="redirect_uri" value="<%= redirect_uri %>">
+      <input type="hidden" name="client_secret" value="<%= client_secret %>">
+      <button type="submit" class="button button-approve">Approve</button>
+    </form>
+
+    <form action="/oauth/authorize" method="POST">
+        <input type="hidden" name="client_id" value="<%= client_id %>">
+        <input type="hidden" name="redirect_uri" value="<%= redirect_uri %>">
+        <input type="hidden" name="client_secret" value="<%= client_secret %>">
+        <input type="hidden" name="decision" value="deny">
+        <button type="submit" class="button button-deny">Deny</button>
+    </form>
+  </div>
+</body>
+</html>

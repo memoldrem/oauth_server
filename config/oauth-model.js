@@ -1,219 +1,155 @@
-const { User, OAuthToken } = require('../models'); // Sequelize models for User and Token
+const { OauthToken, OauthClient, User } = require('../model');
 
-module.exports = {
-  // Retrieve a client based on client ID and secret
-  getClient: async (clientID, clientSecret) => {
-    const client = await db.Client.findOne({ where: { clientID } });
-    if (!client) return null;
-  
-    // If client_secret is not needed, you can skip this check
-    if (clientSecret && client.clientSecret !== clientSecret) {
-      return null;
-    }
-  
-    return {
-      id: client.clientID,
-      grants: client.grants, // e.g., ['authorization_code', 'refresh_token']
-      redirectUris: [client.redirectUri],
-    };
-  },
-  
-  
-  saveToken: async (token, client, user) => {
-    try {
-      const savedToken = await db.Token.create({
-        accessToken: token.accessToken,
-        accessTokenExpiresAt: token.accessTokenExpiresAt,
-        refreshToken: token.refreshToken,
-        refreshTokenExpiresAt: token.refreshTokenExpiresAt,
-        clientID: client.id,
-        userId: user.id,
-      });
+/**
+ * Get access token.
+ */
+module.exports.getAccessToken = async function (bearerToken) {
+  const token = await OauthToken.findOne({ where: { accessToken: bearerToken } });
 
-      return {
-        accessToken: savedToken.accessToken,
-        accessTokenExpiresAt: savedToken.accessTokenExpiresAt,
-        refreshToken: savedToken.refreshToken,
-        refreshTokenExpiresAt: savedToken.refreshTokenExpiresAt,
-        client: { id: client.id },
-        user: { id: user.id },
-      };
-    } catch (err) {
-      console.error('Error in saveToken:', err);
-      throw err;
-    }
-  },
+  if (!token) return null;
 
-  /**
-   * Get access token details.
-   */
-  getAccessToken: async (accessToken) => {
-    try {
-      const token = await db.Token.findOne({
-        where: { accessToken },
-        include: [db.User, db.Client],
-      });
-
-      if (!token) return null;
-
-      return {
-        accessToken: token.accessToken,
-        accessTokenExpiresAt: token.accessTokenExpiresAt,
-        user: token.User,
-        client: token.Client,
-      };
-    } catch (err) {
-      console.error('Error in getAccessToken:', err);
-      throw err;
-    }
-  },
-
-  /**
-   * Get the refresh token details.
-   */
-  getRefreshToken: async (refreshToken) => {
-    try {
-      const token = await db.Token.findOne({
-        where: { refreshToken },
-        include: [db.User, db.Client],
-      });
-
-      if (!token) return null;
-
-      return {
-        refreshToken: token.refreshToken,
-        refreshTokenExpiresAt: token.refreshTokenExpiresAt,
-        user: token.User,
-        client: token.Client,
-      };
-    } catch (err) {
-      console.error('Error in getRefreshToken:', err);
-      throw err;
-    }
-  },
-
-  /**
-   * Revoke a refresh token (e.g., when a user logs out).
-   */
-  revokeToken: async (token) => {
-    try {
-      const deleted = await db.Token.destroy({
-        where: { refreshToken: token.refreshToken },
-      });
-
-      return deleted > 0;
-    } catch (err) {
-      console.error('Error in revokeToken:', err);
-      throw err;
-    }
-  },
-
-  /**
-   * Validate the user credentials for the password grant type.
-   */
-  getUser: async (username, password) => {
-    try {
-      const user = await db.User.findOne({ where: { username } });
-
-      if (!user) return null;
-
-      const validPassword = await bcrypt.compare(password, user.passwordHash);
-      return validPassword ? user : null;
-    } catch (err) {
-      console.error('Error in getUser:', err);
-      throw err;
-    }
-  },
-
-
-  generateAuthorizationCode(user, client) {
-    // Combine user and client information into a unique string
-    const baseString = `${user.id}:${client.clientID}:${new Date().getTime()}`;
-    
-    // Generate a secure random string based on the base string
-    const hash = crypto.createHash('sha256');
-    hash.update(baseString);
-    const authorizationCode = hash.digest('hex'); // 64-character hex string
-
-    // Optionally, store the authorization code in a database with expiration time
-    // Example: Save to an 'AuthorizationCodes' model (not shown here)
-    return authorizationCode;
-  },
-  
-  /**
-   * Validate the authorization code.
-   */
-  getAuthorizationCode: async (code) => {
-    try {
-      const authCode = await db.AuthorizationCode.findOne({
-        where: { code },
-        include: [db.Client, db.User],
-      });
-
-      if (!authCode) return null;
-
-      return {
-        code: authCode.code,
-        expiresAt: authCode.expiresAt,
-        redirectUri: authCode.redirectUri,
-        client: authCode.Client,
-        user: authCode.User,
-      };
-    } catch (err) {
-      console.error('Error in getAuthorizationCode:', err);
-      throw err;
-    }
-  },
-
-  /**
-   * Save the authorization code.
-   */
-  saveAuthorizationCode: async (code, client, user) => {
-    try {
-      const authCode = await db.AuthorizationCode.create({
-        code: code.authorizationCode,
-        expiresAt: code.expiresAt,
-        redirectUri: code.redirectUri,
-        clientID: client.id,
-        userId: user.id,
-      });
-
-      return {
-        authorizationCode: authCode.code,
-        expiresAt: authCode.expiresAt,
-        redirectUri: authCode.redirectUri,
-        client: { id: client.id },
-        user: { id: user.id },
-      };
-    } catch (err) {
-      console.error('Error in saveAuthorizationCode:', err);
-      throw err;
-    }
-  },
-
-  /**
-   * Revoke an authorization code.
-   */
-  revokeAuthorizationCode: async (code) => {
-    try {
-      const deleted = await db.AuthorizationCode.destroy({
-        where: { code: code.authorizationCode },
-      });
-
-      return deleted > 0;
-    } catch (err) {
-      console.error('Error in revokeAuthorizationCode:', err);
-      throw err;
-    }
-  },
-
-  /**
-   * Verify the allowed grant types for a client.
-   */
-  verifyScope: async (token, scope) => {
-    // Add custom scope validation logic here if needed
-    return true;
-  },
-
+  return {
+    accessToken: token.accessToken,
+    accessTokenExpiresOn: token.accessTokenExpiresOn,
+    client: { id: token.clientId },
+    user: { id: token.userId },
+  };
 };
 
+/**
+ * Get client.
+ */
+module.exports.getClient = async function (clientId, clientSecret) {
+  
+
+  
+
+  try {
+    const client = await OauthClient.findOne({
+      where: {
+        clientId,
+        clientSecret,
+      },
+    });
+
+    if (!client) return null;
+    return {
+      clientId: client.client_id,
+      clientSecret: client.client_secret,
+      grants: ['authorization_code', 'password', 'refresh_token'],
+      redirectUris: [client.redirect_uri],
+    };
+  } catch (error) {
+    console.log("Error retrieving client:", error);
+    return null;
+  }
+};
+
+/**
+ * Get refresh token.
+ */
+module.exports.getRefreshToken = async function (refreshToken) {
+  const token = await OauthToken.findOne({ where: { refreshToken } });
+
+  if (!token) return null;
+
+  return {
+    refreshToken: token.refreshToken,
+    refreshTokenExpiresOn: token.refreshTokenExpiresOn,
+    client: { id: token.clientId },
+    user: { id: token.userId },
+  };
+};
+
+/**
+ * Get user (for password grant type).
+ */
+module.exports.getUser = async function (username, password) {
+  const user = await User.findOne({
+    where: {
+      username,
+      password, // Ensure passwords are hashed and verified securely in production
+    },
+  });
+
+  if (!user) return null;
+
+  return { id: user.id };
+};
+
+/**
+ * Save access token.
+ */
+module.exports.saveToken = async function (token, client, user) {
+  const savedToken = await OauthToken.create({
+    accessToken: token.accessToken,
+    accessTokenExpiresOn: token.accessTokenExpiresOn,
+    refreshToken: token.refreshToken,
+    refreshTokenExpiresOn: token.refreshTokenExpiresOn,
+    clientId: client.id,
+    userId: user.id,
+  });
+
+  return {
+    accessToken: savedToken.accessToken,
+    accessTokenExpiresOn: savedToken.accessTokenExpiresOn,
+    refreshToken: savedToken.refreshToken,
+    refreshTokenExpiresOn: savedToken.refreshTokenExpiresOn,
+    client: { id: savedToken.clientId },
+    user: { id: savedToken.userId },
+  };
+};
+
+/**
+ * Save authorization code.
+ */
+module.exports.saveAuthorizationCode = async function (code, client, user) {
+  const savedCode = await OauthAuthorizationCode.create({
+    authorizationCode: code.authorizationCode,
+    expiresAt: code.expiresAt,
+    redirectUri: code.redirectUri,
+    scope: code.scope,
+    clientId: client.id,
+    userId: user.id,
+  });
+
+  return {
+    authorizationCode: savedCode.authorizationCode,
+    expiresAt: savedCode.expiresAt,
+    redirectUri: savedCode.redirectUri,
+    scope: savedCode.scope,
+    client: { id: savedCode.clientId },
+    user: { id: savedCode.userId },
+  };
+};
+
+/**
+ * Get authorization code.
+ */
+module.exports.getAuthorizationCode = async function (authorizationCode) {
+  const code = await OauthAuthorizationCode.findOne({
+    where: { authorizationCode },
+  });
+
+  if (!code) return null;
+
+  return {
+    authorizationCode: code.authorizationCode,
+    expiresAt: code.expiresAt,
+    redirectUri: code.redirectUri,
+    scope: code.scope,
+    client: { id: code.clientId },
+    user: { id: code.userId },
+  };
+};
+
+/**
+ * Revoke authorization code.
+ */
+module.exports.revokeAuthorizationCode = async function (code) {
+  const result = await OauthAuthorizationCode.destroy({
+    where: { authorizationCode: code.authorizationCode },
+  });
+
+  return result > 0;
+};

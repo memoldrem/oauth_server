@@ -1,87 +1,166 @@
-const express = require('express');
+var bodyParser = require('body-parser');
+var express = require('express');
 const session = require('express-session');
-const passport = require('passport');
-const bodyParser = require('body-parser');
-const oauth2orize = require('oauth2orize');
-const { Client, User, AuthorizationCode, Token } = require('./models'); // Define your Sequelize models
+var oauthServer = require('express-oauth-server');
+var util = require('util');
+const flash = require('connect-flash');
+require('dotenv').config();
+const db = require('./model');
+OauthClient = db.OauthClient;
+const oauthModel = require('./config/oauth-model');
 
-// Create OAuth2 server
-const oauthServer = oauth2orize.createServer();
 
-const app = express();
-app.use(bodyParser.urlencoded({ extended: true }));
+
+
+
+// Create an Express application.
+var app = express();
+
+// Add body parser.
+app.set('view engine', 'ejs');
 app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: false }));
+const passport = require('passport');
+const initializePassport = require('./config/passport-config');
+initializePassport(passport); 
+
 app.use(
-  session({
-    secret: 'your-secret-key',
-    resave: false,
-    saveUninitialized: true,
-  })
-);
+    session({
+      secret: process.env.SESSION_SECRET,
+      resave: false,
+      saveUninitialized: false,
+      cookie: { secure: false, httpOnly: true, maxAge: 24 * 60 * 60 * 1000 }, // Update secure: true for production
+    })
+  );
 app.use(passport.initialize());
 app.use(passport.session());
 
-// Passport serialization
-passport.serializeUser((user, done) => done(null, user.id));
-passport.deserializeUser(async (id, done) => {
-  const user = await User.findByPk(id);
-  done(null, user);
+// Passport setup
+require('./config/passport-config')(passport);
+
+// Add OAuth server.
+app.oauth = new oauthServer({
+      model: require('./config/oauth-model'),
+      grants: ['authorization_code', 'password', 'refresh_token'],
+      debug: true, // Enable debugging
+    });
+
+app.get('/', (req, res) => res.render('welcome'));
+app.get('/register', (req, res) => res.render('register'));
+app.post('/register', async (req, res) => {
+  const { username, email, password } = req.body;
+  const hashedPassword = await bcrypt.hash(password, 10);
+  await User.create({ username, email, passwordHash: hashedPassword });
+  res.redirect('/login');
 });
 
-// Passport Local Strategy (for login)
-passport.use(
-  new (require('passport-local').Strategy)(
-    async (username, password, done) => {
+// Post token.
+app.post('/oauth/token', app.oauth.token());
+
+// Get authorization.
+app.get('/oauth/authorize', ensureAuthenticated, function(req, res) {
+
+  return res.render('authorize', {
+    client_id: req.query.client_id,
+    redirect_uri: req.query.redirect_uri,
+    client_secret: 'your-client-secret',
+  });
+});
+
+// Post authorization.
+app.post('/oauth/authorize', async (req, res, next) => {
+    const { client_id, client_secret, redirect_uri, decision } = req.body;
+    console.log('Authorization request received:', req.body);
+    console.log('1')
+   
+
+    if (!client_id || !redirect_uri || !client_secret) {
+      console.log('2')
+        return res.status(400).send('Oauth step: Invalid client_id or redirect_uri');
+    }
+
+    if (decision === 'deny') {
+      console.log('3')
+        return res.send('oauth post step: access denied');
+      }
+
       try {
-        const user = await User.findOne({ where: { username } });
-        if (!user || !(await user.verifyPassword(password))) {
-          return done(null, false);
+        console.log('4')
+        return app.oauth.authorize()(req, res, next);
+      } catch (error) {
+        console.log('5')
+        console.error('Error in authorize():', error);
+        return res.status(500).send('OAuth authorization failed.');
+      }
+});
+
+// Get login.
+app.get('/login', (req, res) => {
+    const { client_id, redirect_uri, state } = req.query;
+    client_secret = 'your-client-secret';
+    console.log('got login')
+
+    if (!client_id || !redirect_uri) {
+      return res.status(400).send('Invalid client_id or redirect_uri');
+    }
+   
+  
+    res.render('login.ejs', { client_id, redirect_uri, client_secret, state });
+});
+
+// Post login.
+app.post('/login', passport.authenticate('local', { failureRedirect: '/login', failureFlash: true }), (req, res) => {
+    
+    const { client_id, redirect_uri, state } = req.body;
+
+        if (!client_id || !redirect_uri) {
+            return res.status(400).send('Invalid client_id or redirect_uri');
         }
-        return done(null, user);
-      } catch (err) {
-        return done(err);
-      }
-    }
-  )
-);
 
-// Register grant type for authorization code
-oauthServer.grant(
-  oauth2orize.grant.code(async (client, redirectUri, user, ares, done) => {
-    try {
-      const code = Math.random().toString(36).substring(7); // Replace with secure code generation
-      await AuthorizationCode.create({
-        code,
-        clientID: client.clientID,
-        redirectUri,
-        userId: user.id,
+        // Redirect to `/oauth/authorize` with query parameters
+        const path = '/oauth/authorize';
+        console.log("post login")
+     
+        const redirectUrl = `${path}?client_id=${client_id}&redirect_uri=${encodeURIComponent(redirect_uri)}`;
+
+
+        console.log('Redirecting to:', redirectUrl);
+        return res.redirect(redirectUrl);
+});
+
+// Get secret.
+app.get('/secret', app.oauth.authenticate(), function(req, res) {
+  // Will require a valid access_token.
+  res.send('Secret area');
+});
+
+app.get('/public', function(req, res) {
+  // Does not require an access_token.
+  res.send('Public area');
+});
+
+
+function ensureAuthenticated(req, res, next) {
+    if (req.isAuthenticated()) {
+      return next();
+    }
+    res.send('user not authenticated')
+  }
+
+// Start listening for requests.
+db.sequelize.sync({ force: false }).then(async () => {
+    const existingClient = await OauthClient.findOne({ where: { clientId: '1' } });
+    if (!existingClient) {
+      // Add the static client to the database
+      await OauthClient.create({
+        clientId: '1',
+        clientSecret: 'your-client-secret',
+        redirectUri: 'http://your-redirect-uri.com',
       });
-      done(null, code);
-    } catch (err) {
-      done(err);
+      console.log('Static client added to database');
+    } else {
+      console.log('Static client already exists');
     }
-  })
-);
-
-// Exchange authorization code for access token
-oauthServer.exchange(
-  oauth2orize.exchange.code(async (client, code, redirectUri, done) => {
-    try {
-      const authCode = await AuthorizationCode.findOne({ where: { code } });
-      if (!authCode || authCode.redirectUri !== redirectUri || authCode.clientID !== client.clientID) {
-        return done(null, false);
-      }
-
-      const token = Math.random().toString(36).substring(7); // Replace with secure token generation
-      await Token.create({
-        token,
-        userId: authCode.userId,
-        clientID: client.clientID,
-      });
-
-      done(null, token);
-    } catch (err) {
-      done(err);
-    }
-  })
-);
+  
+    app.listen(3001, () => console.log('Server running on http://localhost:3001'));
+  }).catch((err) => console.error('Error syncing models:', err));
