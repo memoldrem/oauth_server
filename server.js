@@ -4,12 +4,14 @@ const OAuth2Server = require('oauth2-server');
 const Request = OAuth2Server.Request;
 const Response = OAuth2Server.Response;
 const session = require('express-session');
-const db = require('./model');
+// const db = require('./model');
 const crypto = require('crypto');
-const OauthClient = db.OauthClient;
+// const OauthClient = db.OauthClient;
 require('dotenv').config();
 const passport = require('passport');
+const axios = require('axios');
 const initializePassport = require('./config/passport-config');
+const { url } = require('inspector');
 
 
 const app = express();
@@ -39,7 +41,14 @@ const oauth = new OAuth2Server({
 });
 
 
-app.get('/', (req, res) => res.render('welcome'));
+app.get('/', (req, res) => {res.render('welcome')});
+app.post('/', (req, res) => {
+
+    const clientId = '1';
+    const redirectUri = staticClient.redirectUri;
+    const state = 'xyz';
+    res.redirect(`/login?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}`);    
+});
 app.get('/register', (req, res) => res.render('register'));
 app.post('/register', async (req, res) => {
     const { username, email, password } = req.body;
@@ -48,10 +57,11 @@ app.post('/register', async (req, res) => {
     res.redirect('/login');
   });
 
-  app.get('/login', (req, res) => {
+app.get('/login', (req, res) => {
     const { client_id, redirect_uri, state } = req.query;
     client_secret = 'your-client-secret';
-    console.log('got login')
+    console.log('1', req.query);
+
 
     if (!client_id || !redirect_uri) {
       return res.status(400).send('Invalid client_id or redirect_uri');
@@ -62,46 +72,101 @@ app.post('/register', async (req, res) => {
 });
 
 // Post login.
-app.post('/login', passport.authenticate('local', { failureRedirect: '/login', failureFlash: true }), (req, res) => {
+app.post('/login', (req, res) => {
     
-    const { client_id, redirect_uri, state } = req.body;
+    // const { client_id, redirect_uri, state } = req.body;
+
+    //     if (!client_id || !redirect_uri) {
+    //         return res.status(400).send('Invalid client_id or redirect_uri');
+    //     }
+
+    //     // Redirect to `/oauth/authorize` with query parameters
+    //     const path = '/oauth/authorize';
+    //     console.log("post login")
+     
+    //     const redirectUrl = `${path}?client_id=${client_id}&redirect_uri=${encodeURIComponent(redirect_uri)}`;
+
+
+    //     console.log('Redirecting to:', redirectUrl);
+    //     return res.redirect(redirectUrl);
+    const { username, password } = req.body;
+    console.log(username);
+    console.log(staticUser.username)
+    console.log(password)
+    console.log(staticUser.password)
+    
+
+    if (username === staticUser.username && password === staticUser.password) {
+        req.session.user = staticUser; // Store the static user in the session
+    
+
+        const { client_id, redirect_uri, state } = req.body;
+        console.log('2', req.body);
 
         if (!client_id || !redirect_uri) {
             return res.status(400).send('Invalid client_id or redirect_uri');
         }
 
-        // Redirect to `/oauth/authorize` with query parameters
-        const path = '/oauth/authorize';
-        console.log("post login")
-     
-        const redirectUrl = `${path}?client_id=${client_id}&redirect_uri=${encodeURIComponent(redirect_uri)}`;
-
-
-        console.log('Redirecting to:', redirectUrl);
+        // Redirect to authorization page
+        const redirectUrl = `/oauth/authorize?client_id=${client_id}&redirect_uri=${encodeURIComponent(redirect_uri)}&state=${state}`;
         return res.redirect(redirectUrl);
+    } else {
+        res.status(401).send('Invalid username or password');
+    }
 });
 
 
 
-app.get('/oauth/authorize', ensureAuthenticated, function(req, res) {
+app.get('/oauth/authorize', function(req, res) {
 
-    return res.render('authorize', {
-      client_id: req.query.client_id,
-      redirect_uri: req.query.redirect_uri,
-      client_secret: 'your-client-secret',
-    });
+    // return res.render('authorize', {
+    //   client_id: req.query.client_id,
+    //   redirect_uri: req.query.redirect_uri,
+    //   client_secret: 'your-client-secret',
+    // });
+    const { client_id, redirect_uri, state } = req.query;
+
+    if (
+        client_id !== staticClient.clientId ||
+        redirect_uri !== staticClient.redirectUri
+    ) {
+        return res.status(400).send('Invalid client_id or redirect_uri');
+    }
+
+    res.render('authorize', { client_id, redirect_uri, state });
   });
 
 
-app.post('/oauth/authorize', ensureAuthenticated, (req, res) => {
+app.post('/oauth/authorize', (req, res) => {
+    // const { client_id, redirect_uri, state, decision } = req.body;
+
+    // if (decision === 'approve') {
+    //     // Generate an authorization code
+    //     const authorizationCode = crypto.randomBytes(16).toString('hex');
+    //     const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes expiry
+
+    //     // Store the authorization code and associated data
+    //     authorizationCodes[authorizationCode] = {
+    //         client_id,
+    //         redirect_uri,
+    //         user_id: staticUser.id,
+    //         expiresAt,
+    //     };
+
+    //     const redirectUrl = `${redirect_uri}?code=${authorizationCode}&state=${state}`;
+    //     return res.redirect(redirectUrl);
+    // } else {
+    //     // Deny access
+    //     const redirectUrl = `${redirect_uri}?error=access_denied&state=${state}`;
+    //     return res.redirect(redirectUrl);
+    // }
     const { client_id, redirect_uri, state, decision } = req.body;
+  
 
     if (decision === 'approve') {
-        // Generate an authorization code
         const authorizationCode = crypto.randomBytes(16).toString('hex');
-        const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes expiry
+        const expiresAt = Date.now() + 10 * 60 * 1000; // Expires in 10 minutes
 
-        // Store the authorization code and associated data
         authorizationCodes[authorizationCode] = {
             client_id,
             redirect_uri,
@@ -112,42 +177,131 @@ app.post('/oauth/authorize', ensureAuthenticated, (req, res) => {
         const redirectUrl = `${redirect_uri}?code=${authorizationCode}&state=${state}`;
         return res.redirect(redirectUrl);
     } else {
-        // Deny access
-        const redirectUrl = `${redirect_uri}?error=access_denied&state=${state}`;
-        return res.redirect(redirectUrl);
+ 
+        return res.redirect('/'); // we could probably make this better
+    }
+});
+
+
+app.get('/callback', async (req, res) => {
+    const { code, state } = req.query;  // Retrieve the authorization code and state
+
+
+    if (!code) {
+        return res.status(400).json({ error: 'missing_code' });
+    }
+
+    // Create the POST request body for token exchange
+    const tokenRequestData = {
+        grant_type: 'authorization_code',
+        code: code,
+        redirect_uri: 'http://localhost:3001/callback',
+     // The same redirect URI asyour-client-id in the initial request
+        client_id: '1',
+        client_secret: 'your-client-secret'
+    };
+
+    try {
+        // Send the POST request to the /oauth/token endpoint
+        const tokenResponse = await axios.post('http://localhost:3001/oauth/token', tokenRequestData, {
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            }
+        });
+
+        const { access_token, token_type, expires_in } = tokenResponse.data;
+
+        // Optionally store the access token in the session or a secure place
+        // For example, you might store it in a cookie or a session variable
+        // res.json({
+        //     message: 'Authorization successful!',
+        //     access_token: access_token,
+        //     token_type: token_type,
+        //     expires_in: expires_in
+        // });
+        res.redirect(`http://localhost:3001/secure?access_token=${access_token}`);
+        // res.redirect('/secure') // change?
+    } catch (err) {
+        console.error('Error exchanging authorization code for access token', err);
+        res.status(500).json({ error: 'token_exchange_failed', message: err.message });
     }
 });
 
 // Middleware to handle OAuth token generation
 app.post('/oauth/token', async (req, res) => {
-    const request = new Request(req);
-    const response = new Response(res);
-    console.log('Incoming token request:', req.body);
-    console.log('print!')
+    // const request = new Request(req);
+    // const response = new Response(res);
+    // console.log('Incoming token request:', req.body);
+    // console.log('print!')
 
-    try {
-        console.log('trying..')
+    // try {
+    //     console.log('trying..')
 
-        const token = await oauth.token(request, response);
-        res.json(token);
-    } catch (err) {
-        console.log('issuing token failed.')
-        res.status(err.code || 500).json(err);
+    //     const token = await oauth.token(request, response);
+    //     res.json(token);
+    // } catch (err) {
+    //     console.log('issuing token failed.')
+    //     res.status(err.code || 500).json(err);
+    // }
+    const { code, client_id, client_secret, redirect_uri, grant_type } = req.body;
+
+    if (grant_type !== 'authorization_code') {
+        return res.status(400).json({ error: 'unsupported_grant_type' });
     }
+    console.log(req.body)
+
+    if (
+        client_id !== staticClient.clientId ||
+        client_secret !== staticClient.clientSecret ||
+        redirect_uri !== staticClient.redirectUri
+    ) {
+        return res.status(400).json({ error: 'invalid_client' });
+    }
+
+    const authCode = authorizationCodes[code];
+    if (!authCode || authCode.expiresAt < Date.now()) {
+        return res.status(400).json({ error: 'invalid_grant' });
+    }
+
+    const accessToken = crypto.randomBytes(32).toString('hex');
+    const expiresAt = Date.now() + 60 * 60 * 1000; // Expires in 1 hour
+
+    accessTokens[accessToken] = {
+        user_id: authCode.user_id,
+        client_id: authCode.client_id,
+        expiresAt,
+    };
+
+    delete authorizationCodes[code]; // Invalidate the authorization code
+
+    res.json({
+        access_token: accessToken,
+        token_type: 'Bearer',
+        expires_in: 3600,
+    });
 });
 
 // Middleware to protect routes
-app.get('/secure', async (req, res) => {
-    const request = new Request(req);
-    const response = new Response(res);
+app.get('/secure', (req, res) => {
+    const authHeader = req.headers.authorization;
+    const token = authHeader?.startsWith('Bearer ')
+        ? authHeader.split(' ')[1]
+        : req.query.access_token; // Fallback for query parameter
 
-    try {
-        await oauth.authenticate(request, response);
-        res.send('Secure data accessed!');
-    } catch (err) {
-        res.status(err.code || 500).json(err);
+    if (!token) {
+        return res.status(401).json({ error: 'invalid_request', message: 'Missing token' });
     }
+
+    const storedToken = accessTokens[token];
+
+    if (!storedToken || storedToken.expiresAt < Date.now()) {
+        return res.status(401).json({ error: 'invalid_token', message: 'Token is invalid or expired' });
+    }
+
+    // res.render('dashboard', { user_id: storedToken.user_id });
+    res.render('dashboard')
 });
+
 
 function ensureAuthenticated(req, res, next) {
     if (req.isAuthenticated()) {
@@ -156,39 +310,24 @@ function ensureAuthenticated(req, res, next) {
     res.send('user not authenticated')
   }
 
-// // Start listening for requests.
-// db.sequelize.sync({ force: false }).then(async () => {
-//     const existingClient = await OauthClient.findOne({ where: { clientId: '1' } });
-//     if (!existingClient) {
-//       // Add the static client to the database
-//       await OauthClient.create({
-//         clientId: '1',
-//         clientSecret: 'your-client-secret',
-//         redirectUri: 'http://your-redirect-uri.com',
-//       });
-//       console.log('Static client added to database');
-//     } else {
-//       console.log('Static client already exists');
-//     }
-  
-//     app.listen(3001, () => console.log('Server running on http://localhost:3001'));
-//   }).catch((err) => console.error('Error syncing models:', err));
-
+authorizationCodes = {}
+accessTokens = {}
 // Static client
 const staticClient = {
     clientId: '1',
     clientSecret: 'your-client-secret',
-    redirectUri: 'http://your-redirect-uri.com',
+    redirectUri: 'http://localhost:3001/callback',
 };
 
 // Static user
 const staticUser = {
-    id: '123',
-    username: 'testuser',
-    password: 'password', // Plaintext for simplicity (avoid in production)
+    id: '1',
+    username: 'l@l.com',
+    password: 'l', // Plaintext for simplicity (avoid in production)
 };
 
 // // Temporary stores for tokens and codes
 // const authorizationCodes = {}; // To store authorization codes
 // const accessTokens = {};       // To store access tokens
 
+app.listen(3001, () => console.log('Server running on http://localhost:3001'));

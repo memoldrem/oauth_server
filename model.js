@@ -4,7 +4,7 @@ require('dotenv').config();
 // Initialize Sequelize with the database connection.
 const sequelize = new Sequelize(process.env.DATABASE_URL, {
   dialect: 'postgres',
-  logging: true,
+  logging: false
 });
 
 // Define the OAuth tokens model.
