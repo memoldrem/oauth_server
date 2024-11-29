@@ -4,12 +4,12 @@ const passport = require('passport');
 const bcrypt = require('bcryptjs');
 const session = require('express-session');
 const bodyParser = require('body-parser');
-const db = require('./models');
+const db = require('../models');
 const { randomBytes } = require('crypto');
 const dotenv = require('dotenv');
 const helmet = require('helmet');
 const flash = require('express-flash');
-const initializePassport = require('./config/passport-config');
+const initializePassport = require('../config/passport-config');
 
 dotenv.config();
 
@@ -40,7 +40,7 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 // Passport setup
-require('./config/passport-config')(passport); // Initialize local strategy
+require('../config/passport-config')(passport); // Initialize local strategy
 
 const CLIENT_ID = 1;
 const CLIENT_SECRET = 'someSecretValue';

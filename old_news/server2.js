@@ -7,9 +7,9 @@ const session = require('express-session');
 const dotenv = require('dotenv');
 const OAuth2Server = require('oauth2-server');
 const bodyParser = require('body-parser');
-const db = require('./models');
-const initializePassport = require('./config/passport-config');
-const oauthModel = require('./config/oauth-model'); 
+const db = require('../models');
+const initializePassport = require('../config/passport-config');
+const oauthModel = require('../config/oauth-model'); 
 const helmet = require('helmet'); // secures http headers
 
 dotenv.config();

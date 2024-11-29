@@ -1,4 +1,4 @@
-const { OauthToken, OauthClient, User } = require('../model');
+const { OauthToken, OauthClient, User } = require('../old_news/model');
 
 /**
  * Get access token.
@@ -21,9 +21,6 @@ module.exports.getAccessToken = async function (bearerToken) {
  */
 module.exports.getClient = async function (clientId, clientSecret) {
   
-
-  
-
   try {
     const client = await OauthClient.findOne({
       where: {
