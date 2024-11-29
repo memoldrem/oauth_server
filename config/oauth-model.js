@@ -1,4 +1,4 @@
-const { OauthToken, OauthClient, User } = require('../old_news/model');
+const { OauthToken, OauthClient, User } = require('../model');
 
 /**
  * Get access token.

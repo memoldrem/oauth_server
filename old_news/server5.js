@@ -5,7 +5,7 @@ var oauthServer = require('express-oauth-server');
 var util = require('util');
 const flash = require('connect-flash');
 require('dotenv').config();
-const db = require('./model');
+const db = require('../model');
 OauthClient = db.OauthClient;
 const oauthModel = require('../config/oauth-model');
 

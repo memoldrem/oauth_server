@@ -14,14 +14,16 @@
 
     <p>Do you want to grant access to this application?</p>
     
-    <form action="/oauth/authorize" method="POST">
+    <form action="/oauth/token" method="POST">
       <input type="hidden" name="client_id" value="<%= client_id %>">
       <input type="hidden" name="redirect_uri" value="<%= redirect_uri %>">
       <input type="hidden" name="client_secret" value="<%= client_secret %>">
+      <input type="hidden" name="grant_type" value="<%= "authorization_code" %>">
+      <input type="hidden" name="code" value="<%= "1" %>">
       <button type="submit" class="button button-approve">Approve</button>
     </form>
 
-    <form action="/oauth/authorize" method="POST">
+    <form action="/login" method="GET">
         <input type="hidden" name="client_id" value="<%= client_id %>">
         <input type="hidden" name="redirect_uri" value="<%= redirect_uri %>">
         <input type="hidden" name="client_secret" value="<%= client_secret %>">
