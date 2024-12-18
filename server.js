@@ -1,14 +1,14 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const OAuth2Server = require('oauth2-server');
-const Request = OAuth2Server.Request;
-const Response = OAuth2Server.Response;
+// const Request = OAuth2Server.Request;
+// const Response = OAuth2Server.Response;
 const session = require('express-session');
 // const db = require('./model');
 const crypto = require('crypto');
-// const OauthClient = db.OauthClient;
 require('dotenv').config();
 const passport = require('passport');
+const bcrypt = require('bcrypt');
 const axios = require('axios');
 const initializePassport = require('./config/passport-config');
 const { url } = require('inspector');
@@ -68,13 +68,13 @@ app.get('/login', (req, res) => {
     }
    
   
-    res.render('login.ejs', { client_id, redirect_uri, client_secret, state });
+    res.render('login.ejs', { client_id, redirect_uri, state });
 });
 
 // Post login.
-app.post('/login', (req, res) => {
+app.post('/login', passport.authenticate('local', { failureRedirect: '/login' }), (req, res) => {
     
-    // const { client_id, redirect_uri, state } = req.body;
+    const { client_id, redirect_uri, state } = req.body;
 
     //     if (!client_id || !redirect_uri) {
     //         return res.status(400).send('Invalid client_id or redirect_uri');
@@ -89,35 +89,22 @@ app.post('/login', (req, res) => {
 
     //     console.log('Redirecting to:', redirectUrl);
     //     return res.redirect(redirectUrl);
-    const { username, password } = req.body;
-    console.log(username);
-    console.log(staticUser.username)
-    console.log(password)
-    console.log(staticUser.password)
-    
 
-    if (username === staticUser.username && password === staticUser.password) {
-        req.session.user = staticUser; // Store the static user in the session
-    
+    console.log('1', req.body);
 
-        const { client_id, redirect_uri, state } = req.body;
-        console.log('2', req.body);
-
-        if (!client_id || !redirect_uri) {
-            return res.status(400).send('Invalid client_id or redirect_uri');
-        }
-
-        // Redirect to authorization page
-        const redirectUrl = `/oauth/authorize?client_id=${client_id}&redirect_uri=${encodeURIComponent(redirect_uri)}&state=${state}`;
-        return res.redirect(redirectUrl);
-    } else {
-        res.status(401).send('Invalid username or password');
+    if (!client_id || !redirect_uri) {
+        return res.status(400).send('Invalid client_id or redirect_uri');
     }
+
+    // Redirect to authorization page
+    const redirectUrl = `/oauth/authorize?client_id=${client_id}&redirect_uri=${encodeURIComponent(redirect_uri)}&state=${state}`;
+    return res.redirect(redirectUrl);
+
 });
 
 
 
-app.get('/oauth/authorize', function(req, res) {
+app.get('/oauth/authorize', ensureAuthenticated, function(req, res) {
 
     // return res.render('authorize', {
     //   client_id: req.query.client_id,
@@ -183,7 +170,7 @@ app.post('/oauth/authorize', (req, res) => {
 });
 
 
-app.get('/callback', async (req, res) => {
+app.get('/callback', ensureAuthenticated, async (req, res) => {
     const { code, state } = req.query;  // Retrieve the authorization code and state
 
 
@@ -282,7 +269,7 @@ app.post('/oauth/token', async (req, res) => {
 });
 
 // Middleware to protect routes
-app.get('/secure', (req, res) => {
+app.get('/secure', ensureAuthenticated, (req, res) => {
     const authHeader = req.headers.authorization;
     const token = authHeader?.startsWith('Bearer ')
         ? authHeader.split(' ')[1]
