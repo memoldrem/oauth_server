@@ -1,1 +1,5 @@
-<h1>Index</h1>
+<h1>Hello, <%= client_id %> !</h1>
+<input type="hidden" name="client_id" value="<%= client_id %>">
+<input type="hidden" name="redirect_uri" value="<%= redirect_uri %>">
+<input type="hidden" name="grant_type" value="<%= "authorization_code" %>">
+<input type="hidden" name="code" value="<%= "1" %>">

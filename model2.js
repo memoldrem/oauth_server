@@ -1,104 +1,57 @@
-const model = {
-    getClient: async (clientId, clientSecret) => {
-        // if (clientId === 'client_id' && clientSecret === 'your-client-secret') {
-            return { id: clientId, grants: ['password', 'refresh_token', 'authorization_code'] };
-        // }
-        // return null;
-    },
+const bcrypt = require('bcrypt');
 
+const users = [
+    { id: 1, username: 'test', password: bcrypt.hashSync('password', 10) },
+];
+
+const clients = [
+    { clientId: 'client1', clientSecret: 'secret1', grants: ['password', 'client_credentials'] },
+];
+
+let tokens = []; // Temporary in-memory token store
+
+module.exports = {
+    // Authenticate a user with the password grant type
     getUser: async (username, password) => {
-        if (username === 'user' && password === 'pass') {
-            return { id: '123' };
+        const user = users.find((u) => u.username === username);
+        if (user && (await bcrypt.compare(password, user.password))) {
+            return user;
         }
         return null;
     },
 
-    saveToken: async (token, client, user) => {
-        return {
-            accessToken: token.accessToken,
-            accessTokenExpiresAt: token.accessTokenExpiresAt,
-            refreshToken: token.refreshToken,
-            refreshTokenExpiresAt: token.refreshTokenExpiresAt,
-            client,
-            user,
-        };
+    // Validate the client
+    getClient: (clientId, clientSecret) => {
+        const client = clients.find(
+            (c) => c.clientId === clientId && c.clientSecret === clientSecret
+        );
+        return client ? { ...client, grants: client.grants } : null;
     },
 
-    getAccessToken: async (accessToken) => {
-        // Validate token
-        if (accessToken === 'valid_token') {
-            return {
-                accessToken,
-                accessTokenExpiresAt: new Date(Date.now() + 60 * 60 * 1000),
-                client: { id: 'client_id' },
-                user: { id: '123' },
-            };
-        }
-        return null;
+    // Save the token
+    saveToken: (token, client, user) => {
+        const newToken = { ...token, client, user };
+        tokens.push(newToken);
+        return newToken;
     },
 
-    getRefreshToken: async (refreshToken) => {
-        if (refreshToken === 'valid_refresh_token') {
-            return {
-                refreshToken,
-                refreshTokenExpiresAt: new Date(Date.now() + 60 * 60 * 1000),
-                client: { id: 'client_id' },
-                user: { id: '123' },
-            };
-        }
-        return null;
+    // Get the token
+    getAccessToken: (accessToken) => {
+        const token = tokens.find((t) => t.accessToken === accessToken);
+        return token || null;
     },
 
-    revokeToken: async (token) => {
-        // Logic to revoke token
+    // Revoke a token (optional)
+    revokeToken: (token) => {
+        tokens = tokens.filter((t) => t.accessToken !== token.accessToken);
         return true;
     },
 
-    getAuthorizationCode: async (code) => {
-        // // This is just an example, modify it based on your storage system (e.g., database, memory store)
-        // const authorizationCode = await findAuthorizationCodeInDatabase(code); // Find the code in your database
-        const authorizationCode = 'abc';
+    // Validate scopes (optional)
+    validateScope: (user, client, scope) => scope === null || scope === '',
 
-        if (!authorizationCode) {
-            throw new Error('Authorization code not found');
-        }
-        const expiresAt = new Date();
-        expiresAt.setMinutes(expiresAt.getMinutes() + 10);
-        return {
-            code: authorizationCode,
-            client: {
-                id: '1'
-            },
-            user: {
-                id: '1',
-            },
-            expiresAt: expiresAt
-        }
-    
-
-        // return {
-        //     code: authorizationCode.code,
-        //     client: {
-        //         id: authorizationCode.clientId,  // The client ID associated with this code
-        //     },
-        //     user: {
-        //         id: authorizationCode.userId,  // The user ID associated with this code
-        //     },
-        //     expiresAt: authorizationCode.expiresAt,  // Expiry date of the code
-        // };
-    },
-
-    revokeAuthorizationCode: async (code) => {
-        // Logic to find and revoke the authorization code
-        // Example: Deleting the code from the database
-        // const result = await deleteAuthorizationCodeFromDatabase(code);
-        
-        // if (!result) {
-        //     throw new Error('Failed to revoke authorization code');
-        // }
-
-        return;  // No need to return anything, just successfully revoke the code
+    // Generate custom tokens if needed
+    generateAccessToken: (client, user, scope) => {
+        return `token-${Math.random().toString(36).substring(7)}`;
     },
 };
-
-module.exports = model;
