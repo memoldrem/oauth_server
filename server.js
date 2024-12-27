@@ -55,8 +55,7 @@ const oauth = new OAuth2Server({
 
 // Routes
 
-app.get('/', (req, res) => res.render('welcome'));
-app.post('/', (req, res) => {
+app.get('/', (req, res) => {
     const clientId = '1'; // hard coding, will change
     const redirectUri = staticClient.redirectUri;
     const state = 'xyz';
