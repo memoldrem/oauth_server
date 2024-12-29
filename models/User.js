@@ -1,45 +1,20 @@
-'use strict';
-const {
-  Model
-} = require('sequelize');
 module.exports = (sequelize, DataTypes) => {
-  class User extends Model {
-    /**
-     * Helper method for defining associations.
-     * This method is not a part of Sequelize lifecycle.
-     * The `models/index` file will call this method automatically.
-     */
-
-  }
-    User.init({
-    userID: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
-      autoIncrement: true,
-      primaryKey: true
-    },
-    username: {
-      type: DataTypes.STRING,
-      allowNull: false,
-    },
-    email: {
-        type: DataTypes.STRING,
-        allowNull: false, // add email formatting criteria thru 'validate'
-        validate: { isEmail: true },
-        unique: true,
-    },
-    passwordHash: {
-        type: DataTypes.STRING,
-        allowNull: false,
-    },
-    role: {
-      type: DataTypes.STRING,
-      allowNull: false, // Enforces the NOT NULL constraint
-      defaultValue: 'user', // Provides a default value if none is specified
-    },
-  }, {
-    sequelize,
-    modelName: 'User',
+  const User = sequelize.define('User', {
+      user_id: {
+          type: DataTypes.INTEGER,
+          primaryKey: true,
+          autoIncrement: true,
+      },
+      username: { type: DataTypes.STRING, unique: true, allowNull: false },
+      email: { type: DataTypes.STRING, unique: true, allowNull: false },
+      password_hash: { type: DataTypes.STRING, allowNull: false },
+      role: { type: DataTypes.STRING, defaultValue: 'user', allowNull: false },
   });
+
+  User.associate = (models) => {
+      User.hasMany(models.Client, { foreignKey: 'owner_id', as: 'clients' });
+      User.hasMany(models.Token, { foreignKey: 'user_id', as: 'tokens' });
+  };
+
   return User;
 };

@@ -1,31 +1,21 @@
-'use strict';
-const {
-  Model
-} = require('sequelize');
 module.exports = (sequelize, DataTypes) => {
-  class Token extends Model {
-    /**
-     * Helper method for defining associations.
-     * This method is not a part of Sequelize lifecycle.
-     * The `models/index` file will call this method automatically.
-     */
-    static associate(models) {
-        Token.belongsTo(models.Client, {
-            foreignKey: 'clientID', 
-            as: 'client',           
-          });
-    }
-  }
-  Token.init({
-    tokenID: DataTypes.INTEGER,
-    access_token: DataTypes.STRING,
-    refresh_token: DataTypes.STRING,
-    expires_at: DataTypes.DATE,
-    clientID: DataTypes.INTEGER,
-    userID: DataTypes.INTEGER,
-  }, {
-    sequelize,
-    modelName: 'Token',
+  const Token = sequelize.define('Token', {
+      token_id: {
+          type: DataTypes.INTEGER,
+          primaryKey: true,
+          autoIncrement: true,
+      },
+      access_token: { type: DataTypes.STRING, allowNull: false },
+      refresh_token: { type: DataTypes.STRING },
+      expires_at: { type: DataTypes.DATE, allowNull: false },
+      user_id: { type: DataTypes.INTEGER, allowNull: false },
+      client_id: { type: DataTypes.STRING, allowNull: false },
   });
+
+  Token.associate = (models) => {
+      Token.belongsTo(models.User, { foreignKey: 'user_id', as: 'user' });
+      Token.belongsTo(models.Client, { foreignKey: 'client_id', as: 'client' });
+  };
+
   return Token;
 };

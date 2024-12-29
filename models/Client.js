@@ -1,49 +1,18 @@
-'use strict';
-const {
-  Model
-} = require('sequelize');
 module.exports = (sequelize, DataTypes) => {
-  class Client extends Model {
-    /**
-     * Helper method for defining associations.
-     * This method is not a part of Sequelize lifecycle.
-     * The `models/index` file will call this method automatically.
-     */
-    static associate(models) {
-      Client.hasMany(models.Token, {
-        foreignKey: 'clientID', // Reference to clientID in Token table
-        as: 'tokens', 
-      });
-    }
-  }
-  Client.init({
-    clientID: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
-      autoIncrement: true, // Automatically increment clientID
-      primaryKey: true
-    },
-    clientSecret: {
-      type: DataTypes.STRING,
-      allowNull: false,
-      validate: {
-        notEmpty: true,
-      }
-    },
-    redirectURI: {
-      type: DataTypes.STRING,
-      allowNull: false,
-      // validate: {
-      //   isUrl: true, // Ensure it's a valid URL
-      // }
-    },
-    ownerID: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
-    }
-  }, {
-    sequelize,
-    modelName: 'Client',
+  const Client = sequelize.define('Client', {
+      client_id: {
+          type: DataTypes.STRING,
+          primaryKey: true,
+      },
+      client_secret: { type: DataTypes.STRING, allowNull: false },
+      redirect_uri: { type: DataTypes.STRING, allowNull: false },
+      owner_id: { type: DataTypes.INTEGER, allowNull: false },
   });
+
+  Client.associate = (models) => {
+      Client.belongsTo(models.User, { foreignKey: 'owner_id', as: 'owner' });
+      Client.hasMany(models.Token, { foreignKey: 'client_id', as: 'tokens' });
+  };
+
   return Client;
 };

@@ -24,9 +24,29 @@ app.use(
 );
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
+app.use((req, res, next) => { // Redirect HTTP traffic to HTTPS
+    if (req.headers['x-forwarded-proto'] !== 'https') {
+      return res.redirect(`https://${req.hostname}${req.url}`);
+    }
+    next();
+  });
+  
 
 app.use(passport.initialize());
 app.use(passport.session());
+
+// Sync database
+const db = require('./models');
+
+(async () => {
+    try {
+        await db.sequelize.sync({ alter: true });
+        console.log('Database synced successfully!');
+    } catch (error) {
+        console.error('Error syncing database:', error);
+    }
+})();
+
 
 // In-memory storage for authorization codes and access tokens
 const authorizationCodes = {};
