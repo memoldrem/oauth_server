@@ -1,16 +1,25 @@
 const db = require('./models');
+const { User } = require('./models'); // Adjust the path as needed
+
 
 (async () => {
-    // Create a user
-    const user = await db.User.create({
-        username: 'testuser',
-        email: 'test@example.com',
-        password_hash: 'hashedpassword',
-    });
+    const email = 'test@example.com';
+    const user = await User.findOne({ where: { email } });
+
+    if (user) {
+        console.log('User with this email already exists.');
+    } else {
+        user = await User.create({
+            username: 'testuser',
+            email: email,
+            password_hash: 'hashedpassword',
+        });
+        console.log('User created successfully');
+    }
 
     // Create a client for the user
     const client = await db.Client.create({
-        client_id: 'client1',
+        client_name: 'ha',
         client_secret: 'secret123',
         redirect_uri: 'http://localhost:3000/callback',
         owner_id: user.user_id,

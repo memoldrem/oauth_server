@@ -9,7 +9,11 @@ module.exports = (sequelize, DataTypes) => {
       email: { type: DataTypes.STRING, unique: true, allowNull: false },
       password_hash: { type: DataTypes.STRING, allowNull: false },
       role: { type: DataTypes.STRING, defaultValue: 'user', allowNull: false },
-  });
+  }, {
+    timestamps: true, // Enable Sequelize timestamps
+    createdAt: 'created_at', // Map Sequelize `createdAt` to `created_at`
+    updatedAt: 'updated_at', // Map Sequelize `updatedAt` to `updated_at`
+});
 
   User.associate = (models) => {
       User.hasMany(models.Client, { foreignKey: 'owner_id', as: 'clients' });
