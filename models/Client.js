@@ -11,8 +11,6 @@ module.exports = (sequelize, DataTypes) => {
       owner_id: { type: DataTypes.INTEGER, allowNull: false },
   }, {
     timestamps: true, // Enable Sequelize timestamps
-    createdAt: 'created_at', // Map Sequelize `createdAt` to `created_at`
-    updatedAt: 'updated_at', // Map Sequelize `updatedAt` to `updated_at`
 });
 
   Client.associate = (models) => {

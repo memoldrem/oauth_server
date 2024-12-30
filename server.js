@@ -7,9 +7,21 @@ const bcrypt = require('bcrypt');
 const crypto = require('crypto');
 require('dotenv').config();
 
+//// Authorization Code Grant Flow ******
+// 1. When the user logs in and authorizes a client, an authorization code is created in the AuthorizationCodes table 
+// with an expiry timestamp and the user and client IDs.
+// 2. When the client sends the authorization code to the /callback endpoint, 
+// the server looks up the code in the AuthorizationCodes table, checks if it's 
+// valid, and then issues an access token, which is stored in the AccessTokens table.
+// 3. The access token expires (based on expires_at), and if needed, a refresh token can be 
+// issued to get a new access token.
+
+
+//Passport stuff
 const initializePassport = require('./config/passport-config');
 initializePassport(passport);
 
+// middleware
 const app = express();
 app.set('view engine', 'ejs');
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -36,6 +48,9 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 // Sync database
+const User = require('./models/User');
+const Client = require('./models/Client');
+const Token = require('./models/Token');
 const db = require('./models');
 
 (async () => {

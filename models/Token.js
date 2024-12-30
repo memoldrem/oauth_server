@@ -5,15 +5,13 @@ module.exports = (sequelize, DataTypes) => {
           primaryKey: true,
           autoIncrement: true,
       },
-      access_token: { type: DataTypes.STRING, allowNull: false },
-      refresh_token: { type: DataTypes.STRING },
+      access_token: { type: DataTypes.STRING, allowNull: false, unique: true,},
+      refresh_token: { type: DataTypes.STRING, unique: true, },
       expires_at: { type: DataTypes.DATE, allowNull: false },
       user_id: { type: DataTypes.INTEGER, allowNull: false },
       client_id: { type: DataTypes.STRING, allowNull: false },
     }, {
       timestamps: true, // Enable Sequelize timestamps
-      createdAt: 'created_at', // Map Sequelize `createdAt` to `created_at`
-      updatedAt: 'updated_at', // Map Sequelize `updatedAt` to `updated_at`
   });
 
   Token.associate = (models) => {
