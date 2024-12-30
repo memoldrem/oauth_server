@@ -9,12 +9,15 @@ const env = process.env.NODE_ENV || 'development';
 const config = require(__dirname + '/../config/config.json')[env];
 const db = {};
 
-
 let sequelize;
 if (config.use_env_variable) {
   sequelize = new Sequelize(process.env[config.use_env_variable], config);
 } else {
-  sequelize = new Sequelize(config.database, config.username, config.password, config);
+  sequelize = new Sequelize(config.database, config.username, config.password, {
+    host: config.host,
+    dialect: config.dialect,
+    logging: false,  
+  });
 }
 
 fs
@@ -38,6 +41,14 @@ Object.keys(db).forEach(modelName => {
   }
 });
 
+
+sequelize.sync()
+  .then(() => {
+    console.log("Models synced with database!");
+  })
+  .catch((err) => {
+    console.error("Error syncing the model:", err);
+  });
 
 
 db.sequelize = sequelize;

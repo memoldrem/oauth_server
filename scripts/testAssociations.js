@@ -1,5 +1,5 @@
-const db = require('./models');
-const { User } = require('./models'); // Adjust the path as needed
+const db = require('../models');
+const { User } = require('../models'); // Adjust the path as needed
 
 
 (async () => {

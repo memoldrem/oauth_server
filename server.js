@@ -1,10 +1,11 @@
 const express = require('express');
 const session = require('express-session');
-const OAuth2Server = require('oauth2-server');
 const bodyParser = require('body-parser');
 const passport = require('passport');
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
+const https = require('https');
+const fs = require('fs');
 require('dotenv').config();
 
 //// Authorization Code Grant Flow ******
@@ -36,21 +37,24 @@ app.use(
 );
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
-app.use((req, res, next) => { // Redirect HTTP traffic to HTTPS
-    if (req.headers['x-forwarded-proto'] !== 'https') {
-      return res.redirect(`https://${req.hostname}${req.url}`);
+app.use((req, res, next) => {
+    if (req.headers['x-forwarded-proto'] !== 'https' && req.protocol !== 'https') {
+      return res.redirect(`https://${req.hostname}:${port}${req.url}`); // Ensure correct port and preserve the full URL
     }
     next();
   });
+
+const httpsOptions = {
+    key: fs.readFileSync('./localhost-key.pem'),
+    cert: fs.readFileSync('./localhost.pem'),
+  };
   
 
 app.use(passport.initialize());
 app.use(passport.session());
 
 // Sync database
-const User = require('./models/User');
-const Client = require('./models/Client');
-const Token = require('./models/Token');
+const { AuthorizationCode, AccessToken, Client, User } = require('./models');
 const db = require('./models');
 
 (async () => {
@@ -82,14 +86,14 @@ const staticClient = {
 };
 
 // OAuth2 server configuration
+const OAuth2Server = require('oauth2-server');
 const oauth = new OAuth2Server({
-    model: require('./model2'), // Import OAuth 2.0 model
-    accessTokenLifetime: 60 * 60, // 1 hour
-    allowBearerTokensInQueryString: true,
+  model: require('./OAuth2Model'), 
+  accessTokenLifetime: 60 * 60, // 1 hour
+  allowBearerTokensInQueryString: true,
 });
 
 // Routes
-
 app.get('/', (req, res) => {
     const clientId = '1'; // hard coding, will change
     const redirectUri = staticClient.redirectUri;
@@ -99,7 +103,7 @@ app.get('/', (req, res) => {
 
 app.get('/register', (req, res) => res.render('register'));
 app.post('/register', async (req, res) => {
-    const { username, email, password } = req.body;
+    const { username, password } = req.body;
     const hashedPassword = await bcrypt.hash(password, 10);
     staticUser.username = username;
     staticUser.password = hashedPassword;
@@ -132,8 +136,10 @@ app.post('/login',  (req, res) => {
 
 // ensureAuthenticated,
 // Authorization code flow
-app.get('/oauth/authorize', (req, res) => {
+app.get('/authorize', (req, res) => {
     const { client_id, redirect_uri, state } = req.query;
+    // const { client_id, redirect_uri, state, decision } = req.body;
+
 
     if (client_id !== staticClient.clientId || redirect_uri !== staticClient.redirectUri) {
         return res.status(400).send('Invalid client_id or redirect_uri');
@@ -142,25 +148,32 @@ app.get('/oauth/authorize', (req, res) => {
     res.render('authorize', { client_id, redirect_uri, state });
 });
 
-app.post('/oauth/authorize', (req, res) => {
+app.post('/authorize', (req, res) => {
     const { client_id, redirect_uri, state, decision } = req.body;
 
     if (decision === 'approve') {
         const authorizationCode = crypto.randomBytes(16).toString('hex');
         const expiresAt = Date.now() + 10 * 60 * 1000; // Expires in 10 minutes
 
-        authorizationCodes[authorizationCode] = {
-            client_id,
-            redirect_uri,
-            user_id: staticUser.id,
-            expiresAt,
-        };
+        try {
+            AuthorizationCode.create({
+                authorization_code: authorizationCode,
+                expires_at: expiresAt,
+                redirect_uri,
+                client_id,
+                user_id: staticUser.id, // Assuming staticUser is logged in
+            });
 
-        const redirectUrl = `${redirect_uri}?code=${authorizationCode}&state=${state}`;
-        return res.redirect(redirectUrl);
+            const redirectUrl = `${redirect_uri}?code=${authorizationCode}&state=${state}`;
+            return res.redirect(redirectUrl);
+        } catch (error) {
+            console.error('Error saving authorization code:', error);
+            return res.status(500).send('Internal Server Error');
+        }
     } else {
         return res.redirect('/');
     }
+
 });
 
 // ensureAuthenticated, 
@@ -172,52 +185,82 @@ app.get('/callback', async (req, res) => {
         return res.status(400).json({ error: 'missing_code' });
     }
 
-    const authorizationCode = authorizationCodes[code];
-    if (!authorizationCode || authorizationCode.expiresAt < Date.now()) {
-        return res.status(400).json({ error: 'invalid_grant' });
+    try {
+        // Retrieve the authorization code from the database
+        const authorizationCode = await AuthorizationCode.findOne({
+            where: { authorization_code: code },
+            include: [
+                { model: Client },
+                { model: User }
+            ]
+        });
+
+        if (!authorizationCode || authorizationCode.expires_at < Date.now()) {
+            return res.status(400).json({ error: 'invalid_grant' });
+        }
+
+        // Generate access token
+        const accessToken = crypto.randomBytes(32).toString('hex');
+        const expiresAt = Date.now() + 60 * 60 * 1000; // Expires in 1 hour
+
+        // Save the access token in the database
+        await AccessToken.create({
+            access_token: accessToken,
+            refresh_token: crypto.randomBytes(32).toString('hex'), // Optionally create a refresh token
+            expires_at: expiresAt,
+            user_id: authorizationCode.user_id,
+            client_id: authorizationCode.client_id
+        });
+
+        // Invalidate the authorization code
+        await AuthorizationCode.destroy({ where: { authorization_code: code } });
+
+        res.redirect(`${authorizationCode.redirect_uri}?access_token=${accessToken}&state=${req.query.state}`);
+        // res.redirect(`http://localhost:3001/secure?access_token=${accessToken}&client_id=${authorizationCode.client_id}&redirect_uri=${authorizationCode.redirect_uri}`);
+    } catch (error) {
+        console.error('Error processing callback:', error);
+        return res.status(500).json({ error: 'internal_server_error' });
     }
-
-    const accessToken = crypto.randomBytes(32).toString('hex');
-    const expiresAt = Date.now() + 60 * 60 * 1000; // Expires in 1 hour
-
-    accessTokens[accessToken] = {
-        user_id: authorizationCode.user_id,
-        client_id: authorizationCode.client_id,
-        expiresAt,
-    };
-
-    delete authorizationCodes[code]; // Invalidate the authorization code
-
-    res.redirect(`http://localhost:3001/secure?access_token=${accessToken}&client_id=${authorizationCode.client_id}&redirect_uri=${authorizationCode.redirect_uri}`);
 });
 
 // ensureAuthenticated, 
 app.get('/secure', (req, res) => {
     const { access_token } = req.query;
-    const storedToken = accessTokens[access_token];
 
-    if (!storedToken || storedToken.expiresAt < Date.now()) {
-        return res.status(401).json({ error: 'invalid_token', message: 'Token is invalid or expired' });
+    if (!access_token) {
+        return res.status(400).json({ error: 'missing_access_token' });
     }
 
-    const client_id = req.query.client_id; // Or fetch from elsewhere
-    const redirect_uri = req.query.redirect_uri; // Or fetch from elsewhere
-    const grant_type = 'authorization_code'; // This is fixed as per your example
-    const code = '1'; // Example, replace with real value as needed
+    try {
+        // Retrieve the access token from the database
+        const storedToken = AccessToken.findOne({
+            where: { access_token },
+            include: [
+                { model: Client },
+                { model: User }
+            ]
+        });
 
-    // Render the dashboard and pass the values
-    res.render('dashboard', { 
-        client_id, 
-        redirect_uri, 
-        grant_type, 
-        code 
-    });
+        if (!storedToken || storedToken.expires_at < Date.now()) {
+            return res.status(401).json({ error: 'invalid_token', message: 'Token is invalid or expired' });
+        }
 
-    if (!storedToken || storedToken.expiresAt < Date.now()) {
-        return res.status(401).json({ error: 'invalid_token', message: 'Token is invalid or expired' });
+        // Render the secure page
+        const { client_id, redirect_uri, user_id } = storedToken;
+        const grant_type = 'authorization_code'; // Adjust as necessary
+        const code = '1'; // Example, replace with real value if necessary
+
+        res.render('dashboard', { 
+            client_id, 
+            redirect_uri, 
+            grant_type, 
+            code,
+            user: storedToken.user // Add user information if needed
+        });
+    } catch (error) {
+        console.error('Error validating access token:', error);
+        return res.status(500).json({ error: 'internal_server_error' });
     }
-
-    res.render('dashboard');
 });
 
 // Middleware to ensure the user is authenticated
@@ -228,5 +271,8 @@ function ensureAuthenticated(req, res, next) {
     res.send('User not authenticated');
 }
 
-// Start server
-app.listen(3001, () => console.log('Server running on http://localhost:3001'));
+
+https.createServer(httpsOptions, app).listen(3001, () => {
+    console.log('HTTPS Server running on https://localhost:3001');
+  });
+  
