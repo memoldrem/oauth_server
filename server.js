@@ -4,25 +4,13 @@ const bodyParser = require('body-parser');
 const passport = require('passport');
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
-const https = require('https');
-const fs = require('fs');
 require('dotenv').config();
 
-//// Authorization Code Grant Flow ******
-// 1. When the user logs in and authorizes a client, an authorization code is created in the AuthorizationCodes table 
-// with an expiry timestamp and the user and client IDs.
-// 2. When the client sends the authorization code to the /callback endpoint, 
-// the server looks up the code in the AuthorizationCodes table, checks if it's 
-// valid, and then issues an access token, which is stored in the AccessTokens table.
-// 3. The access token expires (based on expires_at), and if needed, a refresh token can be 
-// issued to get a new access token.
-
-
-//Passport stuff
+// Passport setup
 const initializePassport = require('./config/passport-config');
 initializePassport(passport);
 
-// middleware
+// Middleware
 const app = express();
 app.set('view engine', 'ejs');
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -37,25 +25,13 @@ app.use(
 );
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
-app.use((req, res, next) => {
-    if (req.headers['x-forwarded-proto'] !== 'https' && req.protocol !== 'https') {
-      return res.redirect(`https://${req.hostname}:${port}${req.url}`); // Ensure correct port and preserve the full URL
-    }
-    next();
-  });
-
-const httpsOptions = {
-    key: fs.readFileSync('./localhost-key.pem'),
-    cert: fs.readFileSync('./localhost.pem'),
-  };
-  
 
 app.use(passport.initialize());
 app.use(passport.session());
 
 // Sync database
-const { AuthorizationCode, AccessToken, Client, User } = require('./models');
 const db = require('./models');
+const { AuthorizationCode, Token, Client, User } = require('./models');
 
 (async () => {
     try {
@@ -66,39 +42,14 @@ const db = require('./models');
     }
 })();
 
-
-// In-memory storage for authorization codes and access tokens
-const authorizationCodes = {};
-const accessTokens = {};
-
-// Simulated user database
-const staticUser = {
-    id: '1',
-    username: 'l@l.com',
-    password: 'l', // Plaintext for simplicity
-};
-
-// Simulated client details
-const staticClient = {
-    clientId: '1',
-    clientSecret: 'your-client-secret',
-    redirectUri: 'http://localhost:3001/callback',
-};
-
-// OAuth2 server configuration
-const OAuth2Server = require('oauth2-server');
-const oauth = new OAuth2Server({
-  model: require('./OAuth2Model'), 
-  accessTokenLifetime: 60 * 60, // 1 hour
-  allowBearerTokensInQueryString: true,
-});
-
 // Routes
-app.get('/', (req, res) => {
-    const clientId = '1'; // hard coding, will change
-    const redirectUri = staticClient.redirectUri;
-    const state = 'xyz';
-    res.redirect(`/login?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}`);
+app.get('/', async (req, res) => {
+    try {
+        res.redirect('/login');
+    } catch (err) {
+        console.error('Error during authorization redirect:', err);
+        res.status(500).send('Server Error');
+    }
 });
 
 app.get('/register', (req, res) => res.render('register'));
@@ -110,50 +61,38 @@ app.post('/register', async (req, res) => {
     res.redirect('/login');
 });
 
-app.get('/login', (req, res) => {
-    const { client_id, redirect_uri, state } = req.query;
-    console.log(req.query);
+app.get('/login', (req, res) => res.render('login'));
 
-    if (!client_id || !redirect_uri) {
-        return res.status(400).send('GET: Invalid client_id or redirect_uri');
-    }
+app.post('/login', async (req, res) => {
+    const staticClient = await Client.findOne({ where: { client_id: 1 } });
+    const client_id = staticClient.client_id;
+    const redirect_uri = staticClient.redirect_uri;
+    const state = crypto.randomBytes(16).toString('hex');
 
-    res.render('login', {
-        client_id,
-        redirect_uri,
-        state,
-        client_secret: staticClient.clientSecret 
-    });
-});
-
-// passport.authenticate('local', { failureRedirect: '/login' }),
-
-app.post('/login',  (req, res) => {
-    const { client_id, redirect_uri, state } = req.body;
-    const redirectUrl = `/oauth/authorize?client_id=${client_id}&redirect_uri=${encodeURIComponent(redirect_uri)}&state=${state}`;
+    const redirectUrl = `/authorize?client_id=${client_id}&redirect_uri=${encodeURIComponent(redirect_uri)}&state=${state}`;
+    req.session.state = state;
     return res.redirect(redirectUrl);
 });
 
-// ensureAuthenticated,
-// Authorization code flow
-app.get('/authorize', (req, res) => {
+app.get('/authorize', async (req, res) => {
     const { client_id, redirect_uri, state } = req.query;
-    // const { client_id, redirect_uri, state, decision } = req.body;
 
+    const client = await Client.findOne({ where: { client_id } });
+    
 
-    if (client_id !== staticClient.clientId || redirect_uri !== staticClient.redirectUri) {
-        return res.status(400).send('Invalid client_id or redirect_uri');
-    }
-
+    // if (!client || !client.redirect_uris.includes(redirect_uri)) {
+    //     return res.status(400).send('Unauthorized redirect_uri');
+    // }
     res.render('authorize', { client_id, redirect_uri, state });
 });
 
-app.post('/authorize', (req, res) => {
+app.post('/authorize', async (req, res) => {
     const { client_id, redirect_uri, state, decision } = req.body;
+    const staticUser = await User.findOne({ where: { user_id: 1 } });
 
     if (decision === 'approve') {
         const authorizationCode = crypto.randomBytes(16).toString('hex');
-        const expiresAt = Date.now() + 10 * 60 * 1000; // Expires in 10 minutes
+        const expiresAt = Date.now() + 10 * 60 * 1000;
 
         try {
             AuthorizationCode.create({
@@ -161,7 +100,8 @@ app.post('/authorize', (req, res) => {
                 expires_at: expiresAt,
                 redirect_uri,
                 client_id,
-                user_id: staticUser.id, // Assuming staticUser is logged in
+                user_id: staticUser.user_id,
+                state: 'some_state',
             });
 
             const redirectUrl = `${redirect_uri}?code=${authorizationCode}&state=${state}`;
@@ -171,59 +111,107 @@ app.post('/authorize', (req, res) => {
             return res.status(500).send('Internal Server Error');
         }
     } else {
-        return res.redirect('/');
+        res.send('Request denied');
     }
-
 });
-
-// ensureAuthenticated, 
 
 app.get('/callback', async (req, res) => {
-    const { code } = req.query;
-
-    if (!code) {
-        return res.status(400).json({ error: 'missing_code' });
+    console.log(req.query);
+    const { code, state } = req.query;
+    if (state !== req.session.state) {app.get('/callback', async (req, res) => {
+        console.log(req.query);
+        const { code, state } = req.query;
+        if (state !== req.session.state) {
+            return res.status(400).send('Invalid state parameter');
+        }
+        try {
+            console.log(`Authorization code received: ${code}`);
+            
+            // Check if the AuthorizationCode model is defined and accessible
+            if (!AuthorizationCode) {
+                throw new Error('AuthorizationCode model is not defined');
+            }
+    
+            const authorizationCode = await AuthorizationCode.findOne({
+                where: { authorization_code: code },
+            });
+    
+            console.log(`Authorization code found: ${authorizationCode}`);
+    
+            if (!authorizationCode) {
+                return res.status(400).json({ error: 'No auth code found in database' });
+            } else if (authorizationCode.expires_at < Date.now()) {
+                return res.status(400).json({ error: 'Expired auth code' });
+            }
+    
+            const accessToken = crypto.randomBytes(32).toString('hex');
+            const expiresAt = Date.now() + 60 * 60 * 1000;
+    
+            await Token.create({
+                access_token: accessToken,
+                refresh_token: crypto.randomBytes(32).toString('hex'),
+                expires_at: expiresAt,
+                user_id: authorizationCode.user_id,
+                client_id: authorizationCode.client_id,
+            });
+    
+            console.log('Access token created!');
+    
+            const redirectUri = authorizationCode.redirect_uri;
+            await AuthorizationCode.destroy({ where: { authorization_code: code } });
+    
+            res.redirect(`${redirectUri}?access_token=${accessToken}&state=${req.query.state}`);
+        } catch (error) {
+            console.error('Error processing callback:', error);
+            return res.status(500).json({ error: 'Internal server error in GET callback' });
+        }
+    });
+        return res.status(400).send('Invalid state parameter');
     }
-
     try {
-        // Retrieve the authorization code from the database
-        const authorizationCode = await AuthorizationCode.findOne({
-            where: { authorization_code: code },
-            include: [
-                { model: Client },
-                { model: User }
-            ]
-        });
-
-        if (!authorizationCode || authorizationCode.expires_at < Date.now()) {
-            return res.status(400).json({ error: 'invalid_grant' });
+        console.log(`Authorization code received: ${code}`);
+        
+        // Check if the AuthorizationCode model is defined and accessible
+        if (!AuthorizationCode) {
+            throw new Error('AuthorizationCode model is not defined');
         }
 
-        // Generate access token
-        const accessToken = crypto.randomBytes(32).toString('hex');
-        const expiresAt = Date.now() + 60 * 60 * 1000; // Expires in 1 hour
-
-        // Save the access token in the database
-        await AccessToken.create({
-            access_token: accessToken,
-            refresh_token: crypto.randomBytes(32).toString('hex'), // Optionally create a refresh token
-            expires_at: expiresAt,
-            user_id: authorizationCode.user_id,
-            client_id: authorizationCode.client_id
+        const authorizationCode = await AuthorizationCode.findOne({
+            where: { authorization_code: code },
         });
 
-        // Invalidate the authorization code
+        console.log(`Authorization code found: ${authorizationCode}`);
+
+        if (!authorizationCode) {
+            return res.status(400).json({ error: 'No auth code found in database' });
+        } else if (authorizationCode.expires_at < Date.now()) {
+            return res.status(400).json({ error: 'Expired auth code' });
+        }
+
+        const accessToken = crypto.randomBytes(32).toString('hex');
+        const expiresAt = Date.now() + 60 * 60 * 1000;
+
+        await Token.create({
+            access_token: accessToken,
+            refresh_token: crypto.randomBytes(32).toString('hex'),
+            expires_at: expiresAt,
+            user_id: authorizationCode.user_id,
+            client_id: authorizationCode.client_id,
+        });
+
+        console.log('Access token created!');
+
+        const redirectUri = authorizationCode.redirect_uri;
+        console.log(code);
         await AuthorizationCode.destroy({ where: { authorization_code: code } });
 
-        res.redirect(`${authorizationCode.redirect_uri}?access_token=${accessToken}&state=${req.query.state}`);
-        // res.redirect(`http://localhost:3001/secure?access_token=${accessToken}&client_id=${authorizationCode.client_id}&redirect_uri=${authorizationCode.redirect_uri}`);
+        res.redirect(`/secure?access_token=${accessToken}&state=${req.query.state}`);
     } catch (error) {
         console.error('Error processing callback:', error);
-        return res.status(500).json({ error: 'internal_server_error' });
+        return res.status(500).json({ error: 'Internal server error in GET callback' });
     }
 });
 
-// ensureAuthenticated, 
 app.get('/secure', (req, res) => {
     const { access_token } = req.query;
 
@@ -232,34 +220,30 @@ app.get('/secure', (req, res) => {
     }
 
     try {
-        // Retrieve the access token from the database
-        const storedToken = AccessToken.findOne({
+        const storedToken = Token.findOne({
             where: { access_token },
             include: [
-                { model: Client },
-                { model: User }
-            ]
+                { model: Client, as: 'client' },  // Specify alias
+                { model: User, as: 'user' },      
+            ],
         });
 
         if (!storedToken || storedToken.expires_at < Date.now()) {
             return res.status(401).json({ error: 'invalid_token', message: 'Token is invalid or expired' });
         }
 
-        // Render the secure page
         const { client_id, redirect_uri, user_id } = storedToken;
-        const grant_type = 'authorization_code'; // Adjust as necessary
-        const code = '1'; // Example, replace with real value if necessary
 
-        res.render('dashboard', { 
-            client_id, 
-            redirect_uri, 
-            grant_type, 
-            code,
-            user: storedToken.user // Add user information if needed
+        res.render('dashboard', {
+            client_id,
+            redirect_uri,
+            grant_type: 'authorization_code',
+            code: '1',
+            user: storedToken.user,
         });
     } catch (error) {
         console.error('Error validating access token:', error);
-        return res.status(500).json({ error: 'internal_server_error' });
+        return res.status(500).json({ error: 'internal_server_error in GET secure' });
     }
 });
 
@@ -271,8 +255,8 @@ function ensureAuthenticated(req, res, next) {
     res.send('User not authenticated');
 }
 
-
-https.createServer(httpsOptions, app).listen(3001, () => {
-    console.log('HTTPS Server running on https://localhost:3001');
-  });
-  
+// Start the server
+const port = 3001;
+app.listen(port, () => {
+    console.log(`Server listening on http://localhost:${port}`);
+});

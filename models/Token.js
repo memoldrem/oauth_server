@@ -16,7 +16,7 @@ module.exports = (sequelize, DataTypes) => {
 
   Token.associate = (models) => {
       Token.belongsTo(models.User, { foreignKey: 'user_id', as: 'user' });
-      Token.belongsTo(models.Client, { foreignKey: 'client_id', as: 'client' });
+      Token.belongsTo(models.Client, { foreignKey: 'client_id', as: 'client'});
   };
 
   return Token;

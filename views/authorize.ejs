@@ -14,13 +14,15 @@
 
     <p>Do you want to grant access to this application?</p>
     
-    <form action="/oauth/authorize" method="POST">
+    <form action="/authorize" method="POST">
       <input type="hidden" name="client_id" value="<%= client_id %>">
-      <input type="hidden" name="redirect_uri" value="<%= redirect_uri %>">
-      <input type="hidden" name="grant_type" value="<%= "authorization_code" %>">
-      <input type="hidden" name="code" value="<%= "1" %>">
-      <button type="submit" name="decision" value="approve">Approve</button>
-      <button type="submit" name="decision" value="deny">Deny</button>
+    <input type="hidden" name="redirect_uri" value="<%= redirect_uri %>">
+    <input type="hidden" name="state" value="<%= state %>">
+    
+    <!-- Decision buttons (approve or deny) -->
+    <button type="submit" name="decision" value="approve">Approve</button>
+    <button type="submit" name="decision" value="deny">Deny</button>
+    
     </form>
   </div>
 </body>

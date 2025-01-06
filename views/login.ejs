@@ -11,11 +11,6 @@
     <div class="login-container">
         <h1>Sign In</h1>
         <form action="/login" method="post" class="login-form">
-            <input type="hidden" name="client_id" value="<%= client_id %>">
-            <input type="hidden" name="redirect_uri" value="<%= redirect_uri %>">
-            <input type="hidden" name="client_secret" value="<%= client_secret %>">
-            <input type="hidden" name="grant_type" value="<%= 'authorization_code' %>">
-            <input type="hidden" name="state" value="<%= state %>">
             <div>
                 <label for="email">Email</label>
                 <input id="username" name="username" type="text" autocomplete="email" required autofocus>

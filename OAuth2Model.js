@@ -18,7 +18,7 @@ module.exports = {
     };
   },
 
-  getClient: async (clientId, clientSecret) => {
+  getClient: async (clientId, clientSecret) => { // you could change this to include client secret
     const client = await Client.findOne({ where: { client_id: clientId } });
     if (!client || client.client_secret !== clientSecret) return null;
     return {
