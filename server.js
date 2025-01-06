@@ -212,7 +212,7 @@ app.get('/callback', async (req, res) => {
     }
 });
 
-app.get('/secure', (req, res) => {
+app.get('/secure', async (req, res) => {
     const { access_token } = req.query;
 
     if (!access_token) {
@@ -220,7 +220,7 @@ app.get('/secure', (req, res) => {
     }
 
     try {
-        const storedToken = Token.findOne({
+        const storedToken = await Token.findOne({
             where: { access_token },
             include: [
                 { model: Client, as: 'client' },  // Specify alias
