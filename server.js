@@ -6,9 +6,7 @@ const bcrypt = require('bcrypt');
 const crypto = require('crypto');
 require('dotenv').config();
 
-// Passport setup
-const initializePassport = require('./config/passport-config');
-initializePassport(passport);
+
 
 // Middleware
 const app = express();
@@ -33,6 +31,10 @@ app.use(passport.session());
 const db = require('./models');
 const { AuthorizationCode, Token, Client, User } = require('./models');
 
+// Passport setup
+const initializePassport = require('./config/passport-config');
+initializePassport(passport); // Initialize passport strategies
+
 (async () => {
     try {
         await db.sequelize.sync({ alter: true });
@@ -54,27 +56,101 @@ app.get('/', async (req, res) => {
 
 app.get('/register', (req, res) => res.render('register'));
 app.post('/register', async (req, res) => {
-    const { username, password } = req.body;
-    const hashedPassword = await bcrypt.hash(password, 10);
-    staticUser.username = username;
-    staticUser.password = hashedPassword;
-    res.redirect('/login');
+    const { username, password, email} = req.body;
+
+    try {
+        const existingUser = await User.findOne({ where: { username } }); // Check if the username already exists
+        if (existingUser) {
+            return res.status(400).send('Username already exists');
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const newUser = await User.create({
+            username,
+            email,
+            password_hash: hashedPassword,
+          });
+        // Insert the user into the database
+
+        console.log(`User registered successfully: ${newUser.username}`);
+        res.redirect('/login');
+    } catch (error) {
+        console.error('Error registering user:', error);
+        res.status(500).send('Error registering user');
+    }
 });
 
 app.get('/login', (req, res) => res.render('login'));
 
-app.post('/login', async (req, res) => {
-    const staticClient = await Client.findOne({ where: { client_id: 1 } });
-    const client_id = staticClient.client_id;
-    const redirect_uri = staticClient.redirect_uri;
-    const state = crypto.randomBytes(16).toString('hex');
 
-    const redirectUrl = `/authorize?client_id=${client_id}&redirect_uri=${encodeURIComponent(redirect_uri)}&state=${state}`;
-    req.session.state = state;
-    return res.redirect(redirectUrl);
+// app.post('/login', (req, res, next) => {
+//     passport.authenticate('local', (err, user, info) => {
+//         if (err) {
+//             console.error('Authentication error:', err);
+//             return next(err); // Pass error to error-handling middleware
+//         }
+//         if (!user) {
+//             console.log('Authentication failed:', info.message);
+//             return res.redirect('/login'); // Redirect on failure
+//         }
+
+//         // Log the user in
+//         req.login(user, async (err) => {
+//             if (err) {
+//                 console.error('Login error:', err);
+//                 return next(err);
+//             }
+
+//             try {
+//                 const client = await Client.findOne({ where: { client_id: 1 } }); // Hardcoded client
+//                 if (!client) {
+//                     console.error('Client not found!');
+//                     return res.status(400).send('Invalid client configuration.');
+//                 }
+
+//                 const client_id = client.client_id;
+//                 const redirect_uri = client.redirect_uri;
+//                 const state = crypto.randomBytes(16).toString('hex');
+//                 req.session.state = state;
+
+//                 const redirectUrl = `/authorize?client_id=${client_id}&redirect_uri=${encodeURIComponent(redirect_uri)}&state=${state}`;
+//                 console.log('Redirecting to:', redirectUrl);
+//                 return res.redirect(redirectUrl); // Redirect on success
+//             } catch (dbError) {
+//                 console.error('Database error:', dbError);
+//                 return next(dbError);
+//             }
+//         });
+//     })(req, res, next); // Pass the request, response, and next to `passport.authenticate`
+// });
+
+app.post('/login', (req, res, next) => {
+    console.log("Entering /login route");
+    console.log(req.body);
+    passport.authenticate('local', (err, user, info) => {
+        console.log('Passport authenticate called'); // Debugging log
+        if (err) {
+            console.error('Authentication error:', err);
+            return next(err);
+        }
+        if (!user) {
+            console.log('Authentication failed:', info.message);
+            return res.redirect('/login');
+        }
+
+        req.login(user, (err) => {
+            if (err) {
+                console.error('Login error:', err);
+                return next(err);
+            }
+            return res.redirect('/dashboard'); // Redirect after login
+        });
+    })(req, res, next);
 });
 
-app.get('/authorize', async (req, res) => {
+
+
+app.get('/authorize', ensureAuthenticated, async (req, res) => {
     const { client_id, redirect_uri, state } = req.query;
 
     const client = await Client.findOne({ where: { client_id } });
@@ -93,7 +169,7 @@ app.post('/authorize', async (req, res) => {
     if (decision === 'approve') {
         const authorizationCode = crypto.randomBytes(16).toString('hex');
         const expiresAt = Date.now() + 10 * 60 * 1000;
-
+        console.log("Saving authorization code to the database...");
         try {
             AuthorizationCode.create({
                 authorization_code: authorizationCode,
@@ -103,6 +179,7 @@ app.post('/authorize', async (req, res) => {
                 user_id: staticUser.user_id,
                 state: 'some_state',
             });
+            console.log("Authorization code saved.");
 
             const redirectUrl = `${redirect_uri}?code=${authorizationCode}&state=${state}`;
             return res.redirect(redirectUrl);
@@ -115,72 +192,42 @@ app.post('/authorize', async (req, res) => {
     }
 });
 
-app.get('/callback', async (req, res) => {
+app.get('/callback', ensureAuthenticated, async (req, res) => {
+    console.log('Callback route triggered');
     console.log(req.query);
     const { code, state } = req.query;
-    if (state !== req.session.state) {app.get('/callback', async (req, res) => {
-        console.log(req.query);
-        const { code, state } = req.query;
-        if (state !== req.session.state) {
-            return res.status(400).send('Invalid state parameter');
-        }
-        try {
-            console.log(`Authorization code received: ${code}`);
-            
-            // Check if the AuthorizationCode model is defined and accessible
-            if (!AuthorizationCode) {
-                throw new Error('AuthorizationCode model is not defined');
-            }
-    
-            const authorizationCode = await AuthorizationCode.findOne({
-                where: { authorization_code: code },
-            });
-    
-            console.log(`Authorization code found: ${authorizationCode}`);
-    
-            if (!authorizationCode) {
-                return res.status(400).json({ error: 'No auth code found in database' });
-            } else if (authorizationCode.expires_at < Date.now()) {
-                return res.status(400).json({ error: 'Expired auth code' });
-            }
-    
-            const accessToken = crypto.randomBytes(32).toString('hex');
-            const expiresAt = Date.now() + 60 * 60 * 1000;
-    
-            await Token.create({
-                access_token: accessToken,
-                refresh_token: crypto.randomBytes(32).toString('hex'),
-                expires_at: expiresAt,
-                user_id: authorizationCode.user_id,
-                client_id: authorizationCode.client_id,
-            });
-    
-            console.log('Access token created!');
-    
-            const redirectUri = authorizationCode.redirect_uri;
-            await AuthorizationCode.destroy({ where: { authorization_code: code } });
-    
-            res.redirect(`${redirectUri}?access_token=${accessToken}&state=${req.query.state}`);
-        } catch (error) {
-            console.error('Error processing callback:', error);
-            return res.status(500).json({ error: 'Internal server error in GET callback' });
-        }
-    });
+
+    // Validate the state parameter
+    if (state !== req.session.state) {
         return res.status(400).send('Invalid state parameter');
     }
+
     try {
         console.log(`Authorization code received: ${code}`);
-        
+
         // Check if the AuthorizationCode model is defined and accessible
         if (!AuthorizationCode) {
             throw new Error('AuthorizationCode model is not defined');
         }
 
-        const authorizationCode = await AuthorizationCode.findOne({
-            where: { authorization_code: code },
-        });
+        console.log("Checking authorization code in database...");
+        let authorizationCode;
 
-        console.log(`Authorization code found: ${authorizationCode}`);
+        // Retry loop for fetching the authorization code
+        for (let attempt = 0; attempt < 3; attempt++) {
+            console.log("Attempt", attempt + 1);
+            authorizationCode = await AuthorizationCode.findOne({
+                where: { authorization_code: code },
+            });
+
+            if (authorizationCode) {
+                console.log('Authorization code found:', authorizationCode);
+                break;
+            } else {
+                console.log('Authorization code not found, retrying...');
+                await new Promise(resolve => setTimeout(resolve, 100)); // wait 100ms
+            }
+        }
 
         if (!authorizationCode) {
             return res.status(400).json({ error: 'No auth code found in database' });
@@ -200,19 +247,23 @@ app.get('/callback', async (req, res) => {
         });
 
         console.log('Access token created!');
+        
 
         const redirectUri = authorizationCode.redirect_uri;
-        console.log(code);
+      
         await AuthorizationCode.destroy({ where: { authorization_code: code } });
 
-        res.redirect(`/secure?access_token=${accessToken}&state=${req.query.state}`);
+        // Redirect to the appropriate URL with the access token and state
+        res.redirect(`secure?access_token=${accessToken}&state=${req.query.state}`); // should this come from database?
+
     } catch (error) {
         console.error('Error processing callback:', error);
         return res.status(500).json({ error: 'Internal server error in GET callback' });
     }
 });
 
-app.get('/secure', async (req, res) => {
+
+app.get('/secure', ensureAuthenticated, async (req, res) => {
     const { access_token } = req.query;
 
     if (!access_token) {
@@ -247,6 +298,11 @@ app.get('/secure', async (req, res) => {
     }
 });
 
+app.delete('/logout', (req, res) => {
+    req.logOut();
+    res.redirect('/login');
+});
+
 // Middleware to ensure the user is authenticated
 function ensureAuthenticated(req, res, next) {
     if (req.isAuthenticated()) {
@@ -260,3 +316,4 @@ const port = 3001;
 app.listen(port, () => {
     console.log(`Server listening on http://localhost:${port}`);
 });
+

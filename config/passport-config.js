@@ -1,54 +1,78 @@
 const LocalStrategy = require('passport-local').Strategy;
 const bcrypt = require('bcryptjs');
-const { getUserByEmail, getUserByID } = require('../utils/userUtils'); // Assuming utils folder is correctly structured
+const db = require('../models'); // Adjust path as needed to access your database models
+
+async function getUserByEmail(email) {
+    try {
+        console.log('Looking up user by email:', email);
+        const user = await db.User.findOne({ where: { email } });
+        console.log('User lookup result:', user);
+        return user; 
+    } catch (err) {
+        console.error("Error finding user by email:", err);
+        return null;
+    }
+}
+
+async function getUserByID(id) {
+    try {
+        const user = await db.User.findByPk(id); // Find user by primary key (ID)
+        return user; 
+    } catch (err) {
+        console.error("Error finding user by ID:", err);
+        return null;
+    }
+}
 
 function initializePassport(passport) {
+    console.log("initializing passport");
     const authenticateUser = async (email, password, done) => {
+        console.log("inside authenticate user");
         try {
-            const user = await getUserByEmail(email); // Querying the database
+            if (!email || !password) {
+                console.error("Missing email or password");
+                return done(null, false, { message: "Email and password are required" });
+            }
 
+            console.log(`Authenticating user with email: ${email}`);
+            const user = await getUserByEmail(email);
             if (!user) {
-                return done(null, false, { message: "No user with that email" });
+                // console.log(`No user found with email: ${email}`); // Fake bcrypt compare to prevent timing attacks
+                // await bcrypt.compare(password, '$2a$10$abcdefghijklmnopqrstuv');
+                return done(null, false, { message: "Invalid email or password" });
             }
 
-            console.log('Password:', password);
-            console.log("Password from DB:", user.passwordHash);
-
-            // Comparing the hashed password with the input password
-            if (await bcrypt.compare(password, user.passwordHash)) {
-                return done(null, user);
-            } else {
-                return done(null, false, { message: "Password is incorrect" });
+            const passwordMatch = await bcrypt.compare(password, user.password_hash);
+            if (!passwordMatch) {
+                console.log(`Incorrect password for email: ${email}`);
+                return done(null, false, { message: "Invalid email or password" });
             }
+
+            console.log(`Authentication successful for email: ${email}`);
+            return done(null, user);
         } catch (err) {
-            console.error('Error during authentication:', err);
+            console.error(`Error during authentication for email ${email}:`, err);
             return done(err);
         }
     };
 
-    passport.use(new LocalStrategy({ usernameField: 'email' }, authenticateUser)); // Customizing username field to 'email'
+    passport.use(new LocalStrategy({ usernameField: 'email', passwordField: 'password', debug: true}, authenticateUser));
+
+
 
     passport.serializeUser((user, done) => {
-        // Ensure user and user.id exist before proceeding
-        if (!user) {
-            return done(new Error("User is missing"));
-        } else if (!user.userID) {
-            return done(new Error("User ID is missing"));
-        }
-        return done(null, user.userID); // Only store user ID in session
+        console.log('Serializing user:', user); // probably need some error handling
+        done(null, user.user_id);
     });
-
-    passport.deserializeUser(async (userID, done) => {
-        try {
-            const user = await getUserByID(userID); // Await the asynchronous getUserByID call
-            if (!user) {
-                return done(new Error("User not found"));
-            }
-            return done(null, user); // Return the full user object after retrieving it
-        } catch (err) {
-            console.error('Error deserializing user:', err);
-            return done(err); // Handle any errors during deserialization
+    
+    passport.deserializeUser(async (id, done) => {
+        console.log('Deserializing user with id:', id);
+        const user = await getUserByID(id);
+        if (!user) {
+            console.log('User not found!');
+            return done(new Error('User not found'));
         }
+        done(null, user);
     });
 }
 
