@@ -112,13 +112,11 @@
 <body>
   <div class="container">
     <h1>Authorize Application</h1>
-    <p><strong>Client ID:</strong> <%= client_id %></p>
-    <p><strong>Redirect URI:</strong> <%= redirect_uri %></p>
 
     <p>Do you want to grant access to this application?</p>
     
     <form action="/authorize" method="POST">
-      <input type="hidden" name="client_id" value="<%= client_id %>">
+    <input type="hidden" name="client_id" value="<%= client_id %>">
     <input type="hidden" name="redirect_uri" value="<%= redirect_uri %>">
     <input type="hidden" name="state" value="<%= state %>">
     
