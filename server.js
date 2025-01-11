@@ -82,51 +82,7 @@ app.post('/register', async (req, res) => {
 
 app.get('/login', (req, res) => res.render('login'));
 
-
-// app.post('/login', (req, res, next) => {
-//     passport.authenticate('local', (err, user, info) => {
-//         if (err) {
-//             console.error('Authentication error:', err);
-//             return next(err); // Pass error to error-handling middleware
-//         }
-//         if (!user) {
-//             console.log('Authentication failed:', info.message);
-//             return res.redirect('/login'); // Redirect on failure
-//         }
-
-//         // Log the user in
-//         req.login(user, async (err) => {
-//             if (err) {
-//                 console.error('Login error:', err);
-//                 return next(err);
-//             }
-
-//             try {
-//                 const client = await Client.findOne({ where: { client_id: 1 } }); // Hardcoded client
-//                 if (!client) {
-//                     console.error('Client not found!');
-//                     return res.status(400).send('Invalid client configuration.');
-//                 }
-
-//                 const client_id = client.client_id;
-//                 const redirect_uri = client.redirect_uri;
-//                 const state = crypto.randomBytes(16).toString('hex');
-//                 req.session.state = state;
-
-//                 const redirectUrl = `/authorize?client_id=${client_id}&redirect_uri=${encodeURIComponent(redirect_uri)}&state=${state}`;
-//                 console.log('Redirecting to:', redirectUrl);
-//                 return res.redirect(redirectUrl); // Redirect on success
-//             } catch (dbError) {
-//                 console.error('Database error:', dbError);
-//                 return next(dbError);
-//             }
-//         });
-//     })(req, res, next); // Pass the request, response, and next to `passport.authenticate`
-// });
-
 app.post('/login', (req, res, next) => {
-    console.log("Entering /login route");
-    console.log(req.body);
     passport.authenticate('local', (err, user, info) => {
         console.log('Passport authenticate called'); // Debugging log
         if (err) {
@@ -137,11 +93,28 @@ app.post('/login', (req, res, next) => {
             console.log('Authentication failed:', info.message);
             return res.redirect('/login');
         }
-
-        req.login(user, (err) => {
+        req.login(user, async (err) => {
             if (err) {
                 console.error('Login error:', err);
                 return next(err);
+            }
+            try {
+                const client = await Client.findOne({ where: { client_id: 1 } }); // Hardcoded client
+                if (!client) {
+                    console.error('Client not found!');
+                    return res.status(400).send('Invalid client configuration.');
+                }
+                const client_id = client.client_id;
+                const redirect_uri = client.redirect_uri;
+                const state = crypto.randomBytes(16).toString('hex');
+                req.session.state = state;
+
+                const redirectUrl = `/authorize?client_id=${client_id}&redirect_uri=${encodeURIComponent(redirect_uri)}&state=${state}`;
+                console.log('Redirecting to:', redirectUrl);
+                return res.redirect(redirectUrl); // Redirect on success
+            } catch (dbError) {
+                console.error('Database error:', dbError);
+                return next(dbError);
             }
             return res.redirect('/dashboard'); // Redirect after login
         });
