@@ -1,99 +1,93 @@
-
+/* Basic Reset */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
 
 body {
-    font-family: Arial, sans-serif;
-    background-color: #f1f1f1;
+    font-family: 'Arial', sans-serif;
+    background-color: #fff;
+    background-image: url('path-to-your-image.jpg'); /* Image URL */
+    color: #333;
     display: flex;
     justify-content: center;
     align-items: center;
-    height: 100vh;
+    min-height: 100vh;
 }
 
-/* Login Container */
-.login-container {
-    width: 100%;
-    max-width: 400px;
-    padding: 2rem;
-    background-color: #ffffff;
-    border-radius: 8px;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+h1 {
     text-align: center;
-}
-
-/* UMD Logo */
-.umd-logo {
-    max-width: 150px;
-    margin-bottom: 1rem;
-}
-
-/* Heading */
-.login-container h1 {
-    font-size: 1.5rem;
-    font-weight: bold;
-    color: #cc0000; /* UMD Red */
+    color: #D50032; /* UMD Red */
+    font-size: 2.5rem;
     margin-bottom: 1.5rem;
 }
 
-/* Form Styling */
-.login-form {
-    display: flex;
-    flex-direction: column;
+.login-container {
+    background-color: #fff;
+    padding: 30px;
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    max-width: 400px;
+    text-align: center;
 }
 
-.login-form label {
-    font-size: 0.9rem;
-    color: #555;
-    margin-bottom: 0.3rem;
-    text-align: left;
+.login-form div {
+    margin-bottom: 15px;
 }
 
-.login-form input[type="text"],
-.login-form input[type="password"] {
-    padding: 0.8rem;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    margin-bottom: 1rem;
+label {
+    display: block;
+    font-size: 1.1rem;
+    color: #333;
+    margin-bottom: 5px;
+}
+
+input {
+    width: 100%;
+    padding: 10px;
     font-size: 1rem;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    background-color: #f8f8f8;
     color: #333;
 }
 
-.login-form input[type="text"]:focus,
-.login-form input[type="password"]:focus {
+input:focus {
+    border-color: #D50032; /* UMD Red */
     outline: none;
-    border-color: #cc0000;
-    box-shadow: 0 0 5px rgba(204, 0, 0, 0.3);
+    background-color: #fff;
 }
 
-/* Submit Button */
-.login-form button {
-    background-color: #cc0000;
+button {
+    background-color: #F5A623; /* UMD Yellow */
     color: #fff;
-    padding: 0.8rem;
+    padding: 12px 20px;
+    font-size: 1.1rem;
     border: none;
-    border-radius: 4px;
-    font-size: 1rem;
-    font-weight: bold;
+    border-radius: 5px;
     cursor: pointer;
-    transition: background-color 0.3s;
+    width: 100%;
+    transition: background-color 0.3s ease;
 }
 
-.login-form button:hover {
-    background-color: #a30000;
+button:hover {
+    background-color: #D50032; /* UMD Red */
 }
 
-/* Footer Links */
 .footer-links {
-    margin-top: 1.5rem;
-    font-size: 0.9rem;
-    color: #777;
+    margin-top: 20px;
 }
 
 .footer-links a {
-    color: #cc0000;
+    color: #D50032; /* UMD Red */
     text-decoration: none;
-    margin: 0 0.5rem;
+    font-size: 1rem;
+    transition: color 0.3s ease;
 }
 
 .footer-links a:hover {
-    text-decoration: underline;
+    color: #F5A623; /* UMD Yellow */
 }
+
