@@ -60,6 +60,9 @@ app.get('/', async (req, res) => {
 app.get('/register', (req, res) => res.render('register'));
 app.post('/register', async (req, res) => {
     const { username, password, email} = req.body;
+    // if(password.length < 8){
+
+    // }
 
     try {
         const existingUser = await User.findOne({ where: { username } }); // Check if the username already exists
