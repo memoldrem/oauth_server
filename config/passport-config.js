@@ -4,9 +4,7 @@ const db = require('../models'); // Adjust path as needed to access your databas
 
 async function getUserByEmail(email) {
     try {
-        console.log('Looking up user by email:', email);
         const user = await db.User.findOne({ where: { email } });
-        console.log('User lookup result:', user);
         return user; 
     } catch (err) {
         console.error("Error finding user by email:", err);
@@ -25,20 +23,14 @@ async function getUserByID(id) {
 }
 
 function initializePassport(passport) {
-    console.log("initializing passport");
     const authenticateUser = async (email, password, done) => {
-        console.log("inside authenticate user");
         try {
             if (!email || !password) {
                 console.error("Missing email or password");
                 return done(null, false, { message: "Email and password are required" });
             }
-
-            console.log(`Authenticating user with email: ${email}`);
             const user = await getUserByEmail(email);
             if (!user) {
-                // console.log(`No user found with email: ${email}`); // Fake bcrypt compare to prevent timing attacks
-                // await bcrypt.compare(password, '$2a$10$abcdefghijklmnopqrstuv');
                 return done(null, false, { message: "Invalid email or password" });
             }
 
@@ -48,7 +40,6 @@ function initializePassport(passport) {
                 return done(null, false, { message: "Invalid email or password" });
             }
 
-            console.log(`Authentication successful for email: ${email}`);
             return done(null, user);
         } catch (err) {
             console.error(`Error during authentication for email ${email}:`, err);
@@ -61,12 +52,11 @@ function initializePassport(passport) {
 
 
     passport.serializeUser((user, done) => {
-        console.log('Serializing user:', user); // probably need some error handling
+         // probably need some error handling
         done(null, user.user_id);
     });
     
     passport.deserializeUser(async (id, done) => {
-        console.log('Deserializing user with id:', id);
         const user = await getUserByID(id);
         if (!user) {
             console.log('User not found!');

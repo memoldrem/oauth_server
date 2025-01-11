@@ -4,6 +4,7 @@ const bodyParser = require('body-parser');
 const passport = require('passport');
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
+
 require('dotenv').config();
 
 
@@ -23,6 +24,8 @@ app.use(
 );
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
+app.use(express.static('public')); // this is for CSS
+
 
 app.use(passport.initialize());
 app.use(passport.session());
