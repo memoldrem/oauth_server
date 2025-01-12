@@ -7,6 +7,11 @@ const crypto = require('crypto');
 
 require('dotenv').config();
 
+// The User is the resource owner
+// The Client is the application or service trying to access user resources
+// The Authorization Server manages user authentication and issues tokens
+// The Resource Server holds user data and validates the access tokens for authorization
+
 
 
 // Middleware
@@ -135,9 +140,9 @@ app.get('/authorize', ensureAuthenticated, async (req, res) => {
     const client = await Client.findOne({ where: { client_id } });
     
 
-    // if (!client || !client.redirect_uris.includes(redirect_uri)) {
-    //     return res.status(400).send('Unauthorized redirect_uri');
-    // }
+    if (!client || !client.redirect_uris.includes(redirect_uri)) {
+        return res.status(400).send('Unauthorized redirect_uri');
+    }
     res.render('authorize', { client_id, redirect_uri, state });
 });
 
