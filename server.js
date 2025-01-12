@@ -64,6 +64,7 @@ app.get('/', async (req, res) => {
 
 app.get('/register', (req, res) => res.render('register'));
 app.post('/register', async (req, res) => {
+    console.log(req.body)
     const { username, password, email} = req.body;
     // if(password.length < 8){
 
@@ -93,7 +94,7 @@ app.post('/register', async (req, res) => {
 
 app.get('/login', (req, res) => res.render('login'));
 
-app.post('/login', (req, res, next) => {
+app.post('/login', (req, res, next) => { // add username or email functionality!!!
     passport.authenticate('local', (err, user, info) => {
         console.log('Passport authenticate called'); // Debugging log
         if (err) {

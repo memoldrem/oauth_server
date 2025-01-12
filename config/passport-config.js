@@ -1,10 +1,20 @@
 const LocalStrategy = require('passport-local').Strategy;
 const bcrypt = require('bcryptjs');
-const db = require('../models'); // Adjust path as needed to access your database models
+const db = require('../models'); 
+const { Op } = require('sequelize');
 
-async function getUserByEmail(email) {
+
+async function getUserByEmailOrUser(input) { // ***get user by email or username
     try {
-        const user = await db.User.findOne({ where: { email } });
+        const user = await db.User.findOne({
+            where: {
+              [Op.or]: [
+                { email: input },   // Match email
+                { username: input } // Match username
+              ]
+            }
+          });
+          
         return user; 
     } catch (err) {
         console.error("Error finding user by email:", err);
@@ -23,15 +33,15 @@ async function getUserByID(id) {
 }
 
 function initializePassport(passport) {
-    const authenticateUser = async (email, password, done) => {
+    const authenticateUser = async (username, password, done) => {
         try {
-            if (!email || !password) {
-                console.error("Missing email or password");
-                return done(null, false, { message: "Email and password are required" });
+            if (!username || !password) {
+                console.error("Missing email/user or password");
+                return done(null, false, { message: "Email/user and password are required" });
             }
-            const user = await getUserByEmail(email);
+            const user = await getUserByEmailOrUser(username);
             if (!user) {
-                return done(null, false, { message: "Invalid email or password" });
+                return done(null, false, { message: "Invalid email/user or password" });
             }
 
             const passwordMatch = await bcrypt.compare(password, user.password_hash);
