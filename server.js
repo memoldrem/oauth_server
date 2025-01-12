@@ -37,6 +37,7 @@ app.use(passport.session());
 
 // Sync database
 const db = require('./models');
+const { Op } = require('sequelize');
 const { AuthorizationCode, Token, Client, User } = require('./models');
 
 // Passport setup
@@ -65,15 +66,17 @@ app.get('/', async (req, res) => {
 app.get('/register', (req, res) => res.render('register'));
 app.post('/register', async (req, res) => {
     console.log(req.body)
-    const { username, password, email} = req.body;
-    // if(password.length < 8){
-
-    // }
+    const { username, password, email, date, first_name, last_name} = req.body;
+    // * function to check passward strength * //
 
     try {
         const existingUser = await User.findOne({ where: { username } }); // Check if the username already exists
         if (existingUser) {
             return res.status(400).send('Username already exists');
+        }
+        const existingUser2 = await User.findOne({ where: { email } }); // Check if the username already exists
+        if (existingUser2) {
+            return res.status(400).send('Email already exists');
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
@@ -81,10 +84,20 @@ app.post('/register', async (req, res) => {
             username,
             email,
             password_hash: hashedPassword,
-          });
-        // Insert the user into the database
+            first_name, 
+            last_name,
+            date_of_birth: date,
+        }); // Insert the user into the database
+
+        const newClient = await Client.create({
+            client_secret: crypto.randomBytes(16).toString('hex'),
+            client_name: `d${newUser.user_id}`, // d for default, the user id
+            redirect_uri: 'http://localhost:3001/callback',
+            owner_id: newUser.user_id,
+        });
 
         console.log(`User registered successfully: ${newUser.username}`);
+        console.log(`Default registered successfully: ${newClient.client_name}`);
         res.redirect('/login');
     } catch (error) {
         console.error('Error registering user:', error);
@@ -111,24 +124,34 @@ app.post('/login', (req, res, next) => { // add username or email functionality!
                 return next(err);
             }
             try {
-                const client = await Client.findOne({ where: { client_id: 1 } }); // Hardcoded client
+                // search by user and like categorization
+                const client = await Client.findOne({
+                    where: {
+                      owner_id: user.user_id,
+                      client_name: `d${user.user_id}`, // degault name
+                    },
+                  });
                 if (!client) {
                     console.error('Client not found!');
                     return res.status(400).send('Invalid client configuration.');
                 }
-                const client_id = client.client_id;
-                const redirect_uri = client.redirect_uri;
+
+                req.session.user = { // save the current user in the session, no sensitive info
+                    user_id: user.user_id,
+                    first_name: user.first_name,
+                  };
+
+
                 const state = crypto.randomBytes(16).toString('hex');
                 req.session.state = state;
 
-                const redirectUrl = `/authorize?client_id=${client_id}&redirect_uri=${encodeURIComponent(redirect_uri)}&state=${state}`;
+                const redirectUrl = `/authorize?client_id=${client.client_id}&redirect_uri=${encodeURIComponent(client.redirect_uri)}&state=${state}`;
                 console.log('Redirecting to:', redirectUrl);
                 return res.redirect(redirectUrl); // Redirect on success
             } catch (dbError) {
                 console.error('Database error:', dbError);
                 return next(dbError);
             }
-            return res.redirect('/dashboard'); // Redirect after login
         });
     })(req, res, next);
 });
@@ -137,11 +160,9 @@ app.post('/login', (req, res, next) => { // add username or email functionality!
 
 app.get('/authorize', ensureAuthenticated, async (req, res) => {
     const { client_id, redirect_uri, state } = req.query;
-
     const client = await Client.findOne({ where: { client_id } });
-    
 
-    if (!client || !client.redirect_uris.includes(redirect_uri)) {
+    if (!client || client.owner_id !== req.session.user.user_id) {
         return res.status(400).send('Unauthorized redirect_uri');
     }
     res.render('authorize', { client_id, redirect_uri, state });
@@ -149,7 +170,8 @@ app.get('/authorize', ensureAuthenticated, async (req, res) => {
 
 app.post('/authorize', async (req, res) => {
     const { client_id, redirect_uri, state, decision } = req.body;
-    const staticUser = await User.findOne({ where: { user_id: 1 } });
+    // console.log(req.session.user);
+    const user = await User.findOne({ where: { user_id:  req.session.user.user_id} });
 
     if (decision === 'approve') {
         const authorizationCode = crypto.randomBytes(16).toString('hex');
@@ -161,8 +183,8 @@ app.post('/authorize', async (req, res) => {
                 expires_at: expiresAt,
                 redirect_uri,
                 client_id,
-                user_id: staticUser.user_id,
-                state: 'some_state',
+                user_id: user.user_id,
+                state: crypto.randomBytes(16).toString('hex'), // silly random state? let's follow up on that tho
             });
             console.log("Authorization code saved.");
 
@@ -197,10 +219,7 @@ app.get('/callback', ensureAuthenticated, async (req, res) => {
 
         console.log("Checking authorization code in database...");
         let authorizationCode;
-
-        // Retry loop for fetching the authorization code
-        for (let attempt = 0; attempt < 3; attempt++) {
-            console.log("Attempt", attempt + 1);
+        for (let attempt = 0; attempt < 3; attempt++) { // needed this because timing kept messing up???
             authorizationCode = await AuthorizationCode.findOne({
                 where: { authorization_code: code },
             });
@@ -270,13 +289,7 @@ app.get('/secure', ensureAuthenticated, async (req, res) => {
 
         const { client_id, redirect_uri, user_id } = storedToken;
 
-        res.render('dashboard', {
-            client_id,
-            redirect_uri,
-            grant_type: 'authorization_code',
-            code: '1',
-            user: storedToken.user,
-        });
+        res.render('dashboard', { greeting: req.session.user.first_name,});
     } catch (error) {
         console.error('Error validating access token:', error);
         return res.status(500).json({ error: 'internal_server_error in GET secure' });
@@ -295,6 +308,10 @@ function ensureAuthenticated(req, res, next) {
     }
     res.send('User not authenticated');
 }
+app.use((req, res, next) => {
+    console.log('Session data:', req.session);
+    next();
+});
 
 // Start the server
 const port = 3001;

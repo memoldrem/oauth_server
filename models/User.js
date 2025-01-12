@@ -14,19 +14,19 @@ const User = sequelize.define(
     email: {
       type: DataTypes.STRING,
       allowNull: false,
-      unique: true,
+      unique: false,
     },
     first_name: {
       type: DataTypes.STRING,
-      allowNull: true,
+      allowNull: false,
     },
     last_name: {
       type: DataTypes.STRING,
-      allowNull: true,
+      allowNull: false,
     },
     date_of_birth: {
       type: DataTypes.DATEONLY,
-      allowNull: true,
+      allowNull: false,
     },
     password_hash: {
       type: DataTypes.STRING,
