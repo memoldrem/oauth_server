@@ -143,7 +143,10 @@
         <li><a href="#analytics">Analytics</a></li>
         <li><a href="#settings">Settings</a></li>
         <li><a href="#profile">Profile</a></li>
-        <li><a href="#logout">Logout</a></li>
+        <!-- <li><a href="#logout">Logout</a></li> -->
+        <form id="logoutForm" action="/logout" method="POST" style="display: inline;">
+          <button type="submit" onclick="logout(event)">Logout</button>
+      </form>
       </ul>
     </div>
 

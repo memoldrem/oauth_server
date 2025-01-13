@@ -121,3 +121,48 @@ button:hover {
     display: block;
     opacity: 1;
 }
+
+.auth-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background-color: #fff;
+    padding: 30px;
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    max-width: 400px;
+    text-align: center;
+}
+
+.authorization-form div {
+    margin-bottom: 15px;
+    width: 100%;
+}
+
+
+button {
+    background-color: #F5A623;
+    color: #fff;
+    padding: 12px 20px;
+    font-size: 1.1rem;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    width: 45%; /* Buttons are slightly smaller to fit next to each other */
+    font-family: 'Bitter', serif;
+    margin: 10px;
+    transition: background-color 0.3s ease;
+}
+
+button:hover {
+    background-color: #D50032;
+}
+
+.authorization-buttons {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    gap: 10px; /* Gap between the buttons */
+}

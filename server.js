@@ -13,6 +13,10 @@ require('dotenv').config();
 // The Resource Server holds user data and validates the access tokens for authorization
 
 
+// Cookies are:
+// Manage user sessions (express-session).
+// Persist authentication state (passport).
+// Pass data between the server and client without needing to store it in every request.
 
 // Middleware
 const app = express();
@@ -37,7 +41,6 @@ app.use(passport.session());
 
 // Sync database
 const db = require('./models');
-const { Op } = require('sequelize');
 const { AuthorizationCode, Token, Client, User } = require('./models');
 
 // Passport setup
@@ -251,13 +254,8 @@ app.get('/callback', ensureAuthenticated, async (req, res) => {
         });
 
         console.log('Access token created!');
-        
-
-        const redirectUri = authorizationCode.redirect_uri;
       
         await AuthorizationCode.destroy({ where: { authorization_code: code } });
-
-        // Redirect to the appropriate URL with the access token and state
         res.redirect(`secure?access_token=${accessToken}&state=${req.query.state}`); // should this come from database?
 
     } catch (error) {
@@ -287,7 +285,7 @@ app.get('/secure', ensureAuthenticated, async (req, res) => {
             return res.status(401).json({ error: 'invalid_token', message: 'Token is invalid or expired' });
         }
 
-        const { client_id, redirect_uri, user_id } = storedToken;
+        // const { client_id, redirect_uri, user_id } = storedToken;
 
         res.render('dashboard', { greeting: req.session.user.first_name,});
     } catch (error) {
@@ -296,10 +294,26 @@ app.get('/secure', ensureAuthenticated, async (req, res) => {
     }
 });
 
-app.delete('/logout', (req, res) => {
-    req.logOut();
-    res.redirect('/login');
+app.post('/logout', async (req, res) => { // but like
+    try {
+        const userId = req.session.user.user_id;
+        if (userId) {
+            await Token.destroy({ where: { user_id: userId } });
+        }
+        req.logOut(err => {
+            if (err) {
+                console.error('Logout error:', err);
+                return res.status(500).send('Error during logout.');
+            }
+            res.clearCookie('connect.sid'); // Clear session cookie
+            res.redirect('/login');
+        });
+    } catch (error) {
+        console.error('Error during logout:', error);
+        res.status(500).send('Error during logout.');
+    }
 });
+
 
 // Middleware to ensure the user is authenticated
 function ensureAuthenticated(req, res, next) {
