@@ -131,7 +131,7 @@ app.post('/login', (req, res, next) => { // add username or email functionality!
                 const client = await Client.findOne({
                     where: {
                       owner_id: user.user_id,
-                      client_name: `d${user.user_id}`, // degault name
+                      client_name: `d${user.user_id}`, // default name, this part is hardcoded but i think it would be anyways?
                     },
                   });
                 if (!client) {
@@ -145,7 +145,7 @@ app.post('/login', (req, res, next) => { // add username or email functionality!
                   };
 
 
-                const state = crypto.randomBytes(16).toString('hex');
+                const state = crypto.randomBytes(16).toString('hex'); // what is state for??
                 req.session.state = state;
 
                 const redirectUrl = `/authorize?client_id=${client.client_id}&redirect_uri=${encodeURIComponent(client.redirect_uri)}&state=${state}`;
@@ -163,10 +163,10 @@ app.post('/login', (req, res, next) => { // add username or email functionality!
 
 app.get('/authorize', ensureAuthenticated, async (req, res) => {
     const { client_id, redirect_uri, state } = req.query;
-    const client = await Client.findOne({ where: { client_id } });
+    const client = await Client.findOne({ where: { client_id } }); // is this additional querying necessary?
 
     if (!client || client.owner_id !== req.session.user.user_id) {
-        return res.status(400).send('Unauthorized redirect_uri');
+        return res.status(400).send('Unauthorized client');
     }
     res.render('authorize', { client_id, redirect_uri, state });
 });
@@ -294,7 +294,7 @@ app.get('/secure', ensureAuthenticated, async (req, res) => {
     }
 });
 
-app.post('/logout', async (req, res) => { // but like
+app.delete('/logout', async (req, res) => { // but like
     try {
         const userId = req.session.user.user_id;
         if (userId) {
