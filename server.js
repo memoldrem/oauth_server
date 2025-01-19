@@ -4,6 +4,7 @@ const bodyParser = require('body-parser');
 const passport = require('passport');
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
+const cookieParser = require('cookie-parser');
 
 require('dotenv').config();
 
@@ -12,11 +13,6 @@ require('dotenv').config();
 // The Authorization Server manages user authentication and issues tokens
 // The Resource Server holds user data and validates the access tokens for authorization
 
-
-// Cookies are:
-// Manage user sessions (express-session).
-// Persist authentication state (passport).
-// Pass data between the server and client without needing to store it in every request.
 
 // Middleware
 const app = express();
@@ -34,6 +30,7 @@ app.use(
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.static('public')); // this is for CSS
+app.use(cookieParser());
 
 
 app.use(passport.initialize());
@@ -127,6 +124,16 @@ app.post('/login', (req, res, next) => { // add username or email functionality!
                 return next(err);
             }
             try {
+                const userId = user.user_id
+                const firstName = user.first_name
+
+                res.cookie('user_data', JSON.stringify({ userId, firstName }), {
+                    httpOnly: true, // Cannot be accessed by JavaScript
+                    secure: process.env.NODE_ENV === 'production', // Only set secure cookies in production
+                    maxAge: 86400000, // Cookie expires in 1 day
+                    sameSite: 'Strict', // Prevent CSRF attacks
+                });
+                
                 // search by user and like categorization
                 const client = await Client.findOne({
                     where: {
@@ -139,14 +146,15 @@ app.post('/login', (req, res, next) => { // add username or email functionality!
                     return res.status(400).send('Invalid client configuration.');
                 }
 
-                req.session.user = { // save the current user in the session, no sensitive info
-                    user_id: user.user_id,
-                    first_name: user.first_name,
-                  };
 
+                const state = crypto.randomBytes(16).toString('hex'); // what is state for?
 
-                const state = crypto.randomBytes(16).toString('hex'); // what is state for??
-                req.session.state = state;
+                res.cookie('state', JSON.stringify({ state }), {
+                    httpOnly: true, // Cannot be accessed by JavaScript
+                    secure: process.env.NODE_ENV === 'production', // Only set secure cookies in production
+                    maxAge: 86400000, // Cookie expires in 1 day
+                    sameSite: 'Strict', // Prevent CSRF attacks
+                });
 
                 const redirectUrl = `/authorize?client_id=${client.client_id}&redirect_uri=${encodeURIComponent(client.redirect_uri)}&state=${state}`;
                 console.log('Redirecting to:', redirectUrl);
@@ -165,7 +173,10 @@ app.get('/authorize', async (req, res) => {
     const { client_id, redirect_uri, state } = req.query;
     const client = await Client.findOne({ where: { client_id } }); // is this additional querying necessary?
 
-    if (!client || client.owner_id !== req.session.user.user_id) {
+    const userDataCookie = req.cookies.user_data;
+    const { userId, firstName } = JSON.parse(userDataCookie);
+
+    if (!client || client.owner_id !== userId) { // 
         return res.status(400).send('Unauthorized client');
     }
     res.render('authorize', { client_id, redirect_uri, state });
@@ -173,8 +184,10 @@ app.get('/authorize', async (req, res) => {
 
 app.post('/authorize', async (req, res) => {
     const { client_id, redirect_uri, state, decision } = req.body;
-    console.log(req.session.user);
-    const user = await User.findOne({ where: { user_id:  req.session.user.user_id} });
+    const userDataCookie = req.cookies.user_data;
+    const { userId, firstName } = JSON.parse(userDataCookie);
+    
+    const user = await User.findOne({ where: { user_id: userId} }); // need this too!
 
     if (decision === 'approve') {
         const authorizationCode = crypto.randomBytes(16).toString('hex');
@@ -187,7 +200,7 @@ app.post('/authorize', async (req, res) => {
                 redirect_uri,
                 client_id,
                 user_id: user.user_id,
-                state: crypto.randomBytes(16).toString('hex'), // silly random state? let's follow up on that tho
+                state: crypto.randomBytes(16).toString('hex'), // i think this is just never used? let's follow up on that tho
             });
             console.log("Authorization code saved.");
 
@@ -205,51 +218,39 @@ app.post('/authorize', async (req, res) => {
 app.get('/callback', async (req, res) => {
     console.log('Callback route triggered');
     console.log(req.query);
-    const { code, state } = req.query;
+    const { code, state: queryState } = req.query;
 
+    const stateCookie = req.cookies.state;
+    const { state }  = JSON.parse(stateCookie);
+ 
     // Validate the state parameter
-    if (state !== req.session.state) {
+    if (state !== queryState) { // will this work?
         return res.status(400).send('Invalid state parameter');
     }
 
     try {
-        console.log(`Authorization code received: ${code}`);
-
-        // Check if the AuthorizationCode model is defined and accessible
-        if (!AuthorizationCode) {
-            throw new Error('AuthorizationCode model is not defined');
-        }
-
-        console.log("Checking authorization code in database...");
         let authorizationCode;
         for (let attempt = 0; attempt < 3; attempt++) { // needed this because timing kept messing up???
             authorizationCode = await AuthorizationCode.findOne({
                 where: { authorization_code: code },
             });
-
-            if (authorizationCode) {
-                break;
-            } else {
+            if (authorizationCode) { break; } else {
                 console.log('Authorization code not found, retrying...');
                 await new Promise(resolve => setTimeout(resolve, 100)); // wait 100ms
             }
         }
 
-        if (!authorizationCode) {
-            return res.status(400).json({ error: 'No auth code found in database' });
-        } else if (authorizationCode.expires_at < Date.now()) {
-            return res.status(400).json({ error: 'Expired auth code' });
-        }
+        if (!authorizationCode) { return res.status(400).json({ error: 'No auth code found in database' });
+        } else if (authorizationCode.expires_at < Date.now()) { return res.status(400).json({ error: 'Expired auth code' });}
 
         // access token
-          const accessToken = crypto.randomBytes(32).toString('hex');
-          const accessTokenExpiresAt = Date.now() + 60 * 60 * 1000;  // Access token expires in 1 hour
+        const accessToken = crypto.randomBytes(32).toString('hex');
+        const accessTokenExpiresAt = Date.now() + 60 * 60 * 1000;  // Access token expires in 1 hour
   
           // refresh token
-          const refreshToken = crypto.randomBytes(32).toString('hex');
-          const refreshTokenExpiresAt = Date.now() + 30 * 24 * 60 * 60 * 1000; // Refresh token expires in 30 days
+        const refreshToken = crypto.randomBytes(32).toString('hex');
+        const refreshTokenExpiresAt = Date.now() + 30 * 24 * 60 * 60 * 1000; // Refresh token expires in 30 days
   
-
         await AccessToken.create({
             access_token: accessToken,
             expires_at: accessTokenExpiresAt,
@@ -295,8 +296,10 @@ app.get('/secure', async (req, res) => {
         if (!storedToken || storedToken.expires_at < Date.now()) {
             return res.status(401).json({ error: 'invalid_token', message: 'Token is invalid or expired' });
         }
+        const userDataCookie = req.cookies.user_data;
+        const { userId, firstName } = JSON.parse(userDataCookie);
 
-        res.render('dashboard', { greeting: req.session.user.first_name,});
+        res.render('dashboard', { greeting: firstName,});
     } catch (error) {
         console.error('Error validating access token:', error);
         return res.status(500).json({ error: 'internal_server_error in GET secure' });
@@ -304,32 +307,13 @@ app.get('/secure', async (req, res) => {
 });
 
 app.delete('/logout', async (req, res) => { // but like
-    try {
-        const userId = req.session.user.user_id;
-        if (userId) {
-            await Token.destroy({ where: { user_id: userId } });
-        }
-        req.logOut(err => {
-            if (err) {
-                console.error('Logout error:', err);
-                return res.status(500).send('Error during logout.');
-            }
-            res.clearCookie('connect.sid'); // Clear session cookie
-            res.redirect('/login');
-        });
-    } catch (error) {
-        console.error('Error during logout:', error);
-        res.status(500).send('Error during logout.');
-    }
+
 });
 
 
 app.post('/refresh', async (req, res) => {
     const { refresh_token } = req.body;
-    if (!refresh_token) {
-        return res.status(400).json({ error: 'Missing refresh token' });
-    }
-
+    if (!refresh_token) { return res.status(400).json({ error: 'Missing refresh token' });}
     try {
         const refreshTokenRecord = await RefreshToken.findOne({where: { refresh_token }});
 
