@@ -41,7 +41,7 @@ app.use(passport.session());
 
 // Sync database
 const db = require('./models');
-const { AuthorizationCode, Token, Client, User } = require('./models');
+const { AuthorizationCode, AccessToken, RefreshToken, Client, User } = require('./models');
 
 // Passport setup
 const initializePassport = require('./config/passport-config');
@@ -161,7 +161,7 @@ app.post('/login', (req, res, next) => { // add username or email functionality!
 
 
 
-app.get('/authorize', ensureAuthenticated, async (req, res) => {
+app.get('/authorize', async (req, res) => {
     const { client_id, redirect_uri, state } = req.query;
     const client = await Client.findOne({ where: { client_id } }); // is this additional querying necessary?
 
@@ -173,7 +173,7 @@ app.get('/authorize', ensureAuthenticated, async (req, res) => {
 
 app.post('/authorize', async (req, res) => {
     const { client_id, redirect_uri, state, decision } = req.body;
-    // console.log(req.session.user);
+    console.log(req.session.user);
     const user = await User.findOne({ where: { user_id:  req.session.user.user_id} });
 
     if (decision === 'approve') {
@@ -202,7 +202,7 @@ app.post('/authorize', async (req, res) => {
     }
 });
 
-app.get('/callback', ensureAuthenticated, async (req, res) => {
+app.get('/callback', async (req, res) => {
     console.log('Callback route triggered');
     console.log(req.query);
     const { code, state } = req.query;
@@ -228,7 +228,6 @@ app.get('/callback', ensureAuthenticated, async (req, res) => {
             });
 
             if (authorizationCode) {
-                console.log('Authorization code found:', authorizationCode);
                 break;
             } else {
                 console.log('Authorization code not found, retrying...');
@@ -242,19 +241,31 @@ app.get('/callback', ensureAuthenticated, async (req, res) => {
             return res.status(400).json({ error: 'Expired auth code' });
         }
 
-        const accessToken = crypto.randomBytes(32).toString('hex');
-        const expiresAt = Date.now() + 60 * 60 * 1000;
+        // access token
+          const accessToken = crypto.randomBytes(32).toString('hex');
+          const accessTokenExpiresAt = Date.now() + 60 * 60 * 1000;  // Access token expires in 1 hour
+  
+          // refresh token
+          const refreshToken = crypto.randomBytes(32).toString('hex');
+          const refreshTokenExpiresAt = Date.now() + 30 * 24 * 60 * 60 * 1000; // Refresh token expires in 30 days
+  
 
-        await Token.create({
+        await AccessToken.create({
             access_token: accessToken,
-            refresh_token: crypto.randomBytes(32).toString('hex'),
-            expires_at: expiresAt,
+            expires_at: accessTokenExpiresAt,
             user_id: authorizationCode.user_id,
             client_id: authorizationCode.client_id,
         });
-
         console.log('Access token created!');
-      
+
+        await RefreshToken.create({
+            refresh_token: refreshToken,
+            expires_at: refreshTokenExpiresAt,
+            user_id: authorizationCode.user_id,
+            client_id: authorizationCode.client_id,
+        });
+        console.log('Refresh token created!');
+
         await AuthorizationCode.destroy({ where: { authorization_code: code } });
         res.redirect(`secure?access_token=${accessToken}&state=${req.query.state}`); // should this come from database?
 
@@ -265,7 +276,7 @@ app.get('/callback', ensureAuthenticated, async (req, res) => {
 });
 
 
-app.get('/secure', ensureAuthenticated, async (req, res) => {
+app.get('/secure', async (req, res) => {
     const { access_token } = req.query;
 
     if (!access_token) {
@@ -273,7 +284,7 @@ app.get('/secure', ensureAuthenticated, async (req, res) => {
     }
 
     try {
-        const storedToken = await Token.findOne({
+        const storedToken = await AccessToken.findOne({
             where: { access_token },
             include: [
                 { model: Client, as: 'client' },  // Specify alias
@@ -284,8 +295,6 @@ app.get('/secure', ensureAuthenticated, async (req, res) => {
         if (!storedToken || storedToken.expires_at < Date.now()) {
             return res.status(401).json({ error: 'invalid_token', message: 'Token is invalid or expired' });
         }
-
-        // const { client_id, redirect_uri, user_id } = storedToken;
 
         res.render('dashboard', { greeting: req.session.user.first_name,});
     } catch (error) {
@@ -315,17 +324,38 @@ app.delete('/logout', async (req, res) => { // but like
 });
 
 
-// Middleware to ensure the user is authenticated
-function ensureAuthenticated(req, res, next) {
-    if (req.isAuthenticated()) {
-        return next();
+app.post('/refresh', async (req, res) => {
+    const { refresh_token } = req.body;
+    if (!refresh_token) {
+        return res.status(400).json({ error: 'Missing refresh token' });
     }
-    res.send('User not authenticated');
-}
-app.use((req, res, next) => {
-    console.log('Session data:', req.session);
-    next();
+
+    try {
+        const refreshTokenRecord = await RefreshToken.findOne({where: { refresh_token }});
+
+        if (!refreshTokenRecord) { return res.status(400).json({ error: 'Invalid refresh token' });}
+        if (refreshTokenRecord.expires_at < Date.now()) {return res.status(400).json({ error: 'Expired refresh token' });}
+
+        const newAccessToken = crypto.randomBytes(32).toString('hex');
+        const newAccessTokenExpiresAt = Date.now() + 60 * 60 * 1000; // 1 hour
+
+        // Update the AccessToken model with the new access token
+        await AccessToken.create({
+            access_token: newAccessToken,
+            expires_at: newAccessTokenExpiresAt,
+            user_id: refreshTokenRecord.user_id,
+            client_id: refreshTokenRecord.client_id
+        });
+
+        res.json({ access_token: newAccessToken });
+    } catch (error) {
+        console.error('Error refreshing access token:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
 });
+
+
+
 
 // Start the server
 const port = 3001;
