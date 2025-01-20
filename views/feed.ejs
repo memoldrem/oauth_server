@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Feed</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        .container {
+            width: 80%;
+            margin: auto;
+            padding: 20px;
+        }
+        .post {
+            background-color: white;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+        }
+        .post h2 {
+            margin-top: 0;
+        }
+        .post .author {
+            font-style: italic;
+            color: #555;
+        }
+        .post p {
+            color: #333;
+        }
+        .post .content {
+            margin-top: 10px;
+            color: #444;
+        }
+    </style>
+</head>
+<body>
+    <h1><%= greeting %>'s Feed</h1>
+
+    <div class="container">
+        <!-- Placeholder for feed posts -->
+        <div class="post">
+            <h2>Post Title #1</h2>
+            <div class="author">by John Doe</div>
+            <p class="content">This is the content of the first post. It can be longer and include more details...</p>
+        </div>
+
+        <div class="post">
+            <h2>Post Title #2</h2>
+            <div class="author">by Jane Smith</div>
+            <p class="content">This is the content of the second post. The content can be as long as needed...</p>
+        </div>
+
+        <div class="post">
+            <h2>Post Title #3</h2>
+            <div class="author">by Alice Johnson</div>
+            <p class="content">This is the content of the third post. Placeholder content for now...</p>
+        </div>
+
+    </div>
+
+</body>
+</html>

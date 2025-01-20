@@ -2,17 +2,15 @@ const { AccessToken, RefreshToken, User, Client } = require('../models');
 const crypto = require('crypto');
 
 const checkAccessTokenValidity = async (req, res, next) => {
-    const { access_token } = req.query;
-    const { refresh_token } = req.body; // Assuming refresh token is passed in the body for refresh attempts
-
-    if (!access_token) {
+    const refresh_token = req.cookies.refresh_token;
+    if (!req.cookies.access_token) {
         return res.status(400).json({ error: 'Missing access token' });
     }
 
     try {
 
         const storedToken = await AccessToken.findOne({
-            where: { access_token },
+            where: { access_token: req.cookies.access_token },
             include: [
                 { model: Client, as: 'client' },
                 { model: User, as: 'user' },
@@ -24,7 +22,7 @@ const checkAccessTokenValidity = async (req, res, next) => {
                 console.log('Access token expired. Attempting to refresh...');
                 
                 if (!refresh_token) {
-                    return res.status(400).json({ error: 'Missing refresh token' });
+                    return res.status(400).json({ error: 'No refresh token provided. Could not refresh.' });
                 }
 
                 // Find the refresh token in the database
@@ -33,14 +31,14 @@ const checkAccessTokenValidity = async (req, res, next) => {
                 });
 
                 if (!storedRefreshToken) {
-                    return res.status(400).json({ error: 'Invalid refresh token' });
+                    return res.status(400).json({ error: 'Invalid refresh token provided. Could not refresh.' });
                 }
 
-                // Check if refresh token has expired. if it has, LOG OUT the user and include a message about how the session timed out
+               
                 if (storedRefreshToken.expires_at < Date.now()) {
-                    return res.status(400).json({ error: 'Expired refresh token' });
+                    res.redirect('/logout'); // LOG OUT the user and include a message about how the session timed out
                 }
-
+                
                 // Generate a new access token
                 const newAccessToken = crypto.randomBytes(32).toString('hex');
                 const newAccessTokenExpiresAt = Date.now() + 60 * 60 * 1000;  // 1 hour
@@ -53,8 +51,18 @@ const checkAccessTokenValidity = async (req, res, next) => {
                     client_id: storedRefreshToken.client_id,
                 });
 
+                await storedToken.destroy(); // Delete the old access token
+                res.clearCookie('access_token'); 
+
+                res.cookie('access_token', newAccessToken, {
+                    httpOnly: true,  // Prevent JavaScript access
+                    secure: process.env.NODE_ENV === 'production',  // Send over HTTPS in production
+                    sameSite: 'Strict',  // Prevent CSRF
+                    maxAge: 3600000,  // 1 hour expiration
+                });
+
                 // Return new access token to the user
-                return res.json({ access_token: newAccessToken });
+                return next();
 
             } else {
                 console.log('Access token is valid');
