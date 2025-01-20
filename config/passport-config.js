@@ -46,13 +46,13 @@ function initializePassport(passport) {
 
             const passwordMatch = await bcrypt.compare(password, user.password_hash);
             if (!passwordMatch) {
-                console.log(`Incorrect password for email: ${email}`);
+                console.log(`Incorrect password for email: ${username}`);
                 return done(null, false, { message: "Invalid email or password" });
             }
 
             return done(null, user);
         } catch (err) {
-            console.error(`Error during authentication for email ${email}:`, err);
+            console.error(`Error during authentication for email ${username}:`, err);
             return done(err);
         }
     };
