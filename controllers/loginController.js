@@ -3,7 +3,6 @@ const passport = require('passport');
 const initializePassport = require('../config/passport-config');
 initializePassport(passport); // Initialize passport strategies
 const crypto = require('crypto');
-const cookieParser = require('cookie-parser');
 
 exports.getLogin = (req, res) => res.render('login');
 

@@ -6,7 +6,22 @@ exports.getRegister = (req, res) => res.render('register');
 
 exports.postRegister = async (req, res) => {
     const { username, password, email, date, first_name, last_name } = req.body;
-    // * function to check passward strength * //
+    if (!username || !password || !email || !date || !first_name || !last_name) {
+        return res.status(400).send('All fields are required');
+    }
+
+     const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
+     if (!emailRegex.test(email)) {
+         return res.status(400).send('Invalid email format');
+     }
+ 
+     // At least 8 characters, 1 letter, 1 number
+     const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$/;
+     if (!passwordRegex.test(password)) {
+         return res.status(400).send('Password must be at least 8 characters long and contain at least 1 letter and 1 number');
+     }
+
+
     try {
         const existingUser = await User.findOne({ where: { username } }); // Check if the username already exists
         if (existingUser) {
@@ -41,5 +56,5 @@ exports.postRegister = async (req, res) => {
     } catch (error) {
         console.error('Error registering user:', error);
         res.status(500).send('Error registering user');
-    } // <- Fixed the missing bracket
+    } 
 };
