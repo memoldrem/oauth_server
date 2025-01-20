@@ -2,15 +2,25 @@ const bcrypt = require('bcrypt');
 const crypto = require('crypto');
 const { User, Client } = require('../models');
 
-exports.getRegister = (req, res) => res.render('register');
+exports.getRegister = (req, res) => {
+    
+    const csrfToken = crypto.randomBytes(16).toString('hex')
+    req.session.csrfToken = csrfToken;
+    res.render('register', { csrf_token: csrfToken,})
+};
 
 exports.postRegister = async (req, res) => {
-    const { username, password, email, date, first_name, last_name } = req.body;
+    const { username, password, email, date, first_name, last_name, csrf_token } = req.body;
     if (!username || !password || !email || !date || !first_name || !last_name) {
         return res.status(400).send('All fields are required');
     }
 
+    if (csrf_token !== req.session.csrfToken) {
+        return res.status(400).send('Invalid CSRF token');
+    }
+
      const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
+     
      if (!emailRegex.test(email)) {
          return res.status(400).send('Invalid email format');
      }
@@ -46,7 +56,7 @@ exports.postRegister = async (req, res) => {
         const newClient = await Client.create({
             client_secret: crypto.randomBytes(16).toString('hex'),
             client_name: `d${newUser.user_id}`, // d for default, the user id
-            redirect_uri: 'http://localhost:3001/callback',
+            redirect_uri: '/callback',
             owner_id: newUser.user_id,
         });
 

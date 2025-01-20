@@ -4,9 +4,18 @@ const initializePassport = require('../config/passport-config');
 initializePassport(passport); // Initialize passport strategies
 const crypto = require('crypto');
 
-exports.getLogin = (req, res) => res.render('login');
+exports.getLogin = (req, res) => {
+    const csrfToken = crypto.randomBytes(16).toString('hex')
+    req.session.csrfToken = csrfToken;
+    res.render('login', { csrf_token: csrfToken,})
+};
 
-exports.postLogin = (req, res, next) => { 
+exports.postLogin = (req, res, next) => {
+    const {csrf_token} = req.body;
+    if (csrf_token !== req.session.csrfToken) {
+        return res.status(400).send('Invalid CSRF token');
+    }
+
     passport.authenticate('local', (err, user, info) => {
         console.log('Passport authenticate called'); // Debugging log
         if (err) {
