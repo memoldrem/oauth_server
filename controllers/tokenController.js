@@ -3,10 +3,8 @@ const crypto = require('crypto');
 
 
 exports.getCallback = async (req, res) => {
-    console.log('Callback route triggered');
-    console.log(req.query);
-    const { code, state: queryState } = req.query;
 
+    const { code, state: queryState } = req.query;
     const stateCookie = req.cookies.state;
     const { state }  = JSON.parse(stateCookie);
  
@@ -14,6 +12,7 @@ exports.getCallback = async (req, res) => {
     if (state !== queryState) { // will this work?
         return res.status(400).send('Invalid state parameter');
     }
+    
 
     try {
         let authorizationCode;
@@ -54,9 +53,23 @@ exports.getCallback = async (req, res) => {
         });
         console.log('Refresh token created!');
 
-        await AuthorizationCode.destroy({ where: { authorization_code: code } });
-        res.redirect(`dashboard?access_token=${accessToken}&state=${req.query.state}`); // should this come from database?
+            // Set a cookie for access token
+        res.cookie('access_token', accessToken, {
+            httpOnly: true,  // Prevent JavaScript access
+            secure: process.env.NODE_ENV === 'production',  // Send over HTTPS in production
+            sameSite: 'Strict',  // Prevent CSRF
+            maxAge: 3600000,  // 1 hour expiration
+        });
 
+        res.cookie('refresh_token', refreshToken, {
+            httpOnly: true,  // Prevent JavaScript access
+            secure: process.env.NODE_ENV === 'production',  // Send over HTTPS in production
+            sameSite: 'Strict',  // Prevent CSRF
+            maxAge: 30 * 24 * 60 * 60 * 1000,  // Refresh token expires in 30 days
+        });
+
+        await AuthorizationCode.destroy({ where: { authorization_code: code } });
+        res.redirect(`dashboard?access_token=${accessToken}&state=${queryState}`); 
     } catch (error) {
         console.error('Error processing callback:', error);
         return res.status(500).json({ error: 'Internal server error in GET callback' });

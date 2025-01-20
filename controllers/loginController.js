@@ -1,8 +1,9 @@
-const { Client } = require('../models');
+const { Client, RefreshToken, AccessToken } = require('../models');
 const passport = require('passport');
 const initializePassport = require('../config/passport-config');
 initializePassport(passport); // Initialize passport strategies
 const crypto = require('crypto');
+const cookieParser = require('cookie-parser');
 
 exports.getLogin = (req, res) => res.render('login');
 
@@ -25,7 +26,6 @@ exports.postLogin = (req, res, next) => {
             try {
                 const userId = user.user_id
                 const firstName = user.first_name
-
                 res.cookie('user_data', JSON.stringify({ userId, firstName }), {
                     httpOnly: true, // Cannot be accessed by JavaScript
                     secure: process.env.NODE_ENV === 'production', // Only set secure cookies in production
@@ -33,7 +33,6 @@ exports.postLogin = (req, res, next) => {
                     sameSite: 'Strict', // Prevent CSRF attacks
                 });
                 
-                // search by user and like categorization
                 const client = await Client.findOne({
                     where: {
                       owner_id: user.user_id,
@@ -46,7 +45,7 @@ exports.postLogin = (req, res, next) => {
                 }
 
 
-                const state = crypto.randomBytes(16).toString('hex'); // what is state for?
+                const state = crypto.randomBytes(16).toString('hex'); 
 
                 res.cookie('state', JSON.stringify({ state }), {
                     httpOnly: true, // Cannot be accessed by JavaScript
@@ -65,3 +64,41 @@ exports.postLogin = (req, res, next) => {
         });
     })(req, res, next);
 }
+
+
+
+exports.logout = async (req, res) => {
+    try {
+        const accessTokenId = req.cookies.access_token;
+        const refreshTokenId = req.cookies.refresh_token;
+
+        if (accessTokenId) {
+            await AccessToken.destroy({ where: { access_token: accessTokenId } });
+            console.log('Access token destroyed');
+        }
+
+        if (refreshTokenId) {
+            await RefreshToken.destroy({ where: { refresh_token: refreshTokenId } });
+            console.log('Refresh token destroyed');
+        }
+       
+        res.clearCookie('user_data');
+        res.clearCookie('state'); 
+        res.clearCookie('access_token'); 
+        res.clearCookie('refresh_token'); 
+
+        
+        req.session.destroy((err) => {
+            if (err) {
+                console.error('Error destroying session:', err);
+                return res.status(500).json({ error: 'Error during session destruction' });
+            }
+
+            // Redirect user to login page or a confirmation page
+            res.redirect('/login'); // also add a little flag that user logged out
+        });
+    } catch (error) {
+        console.error('Error during logout:', error);
+        res.status(500).json({ error: 'Internal server error during logout' });
+    }
+};
