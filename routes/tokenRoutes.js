@@ -4,6 +4,7 @@ const tokenController = require('../controllers/tokenController');
 
 
 router.get('/callback', tokenController.getCallback);
+router.post('/validate', tokenController.validate);
 
 
 

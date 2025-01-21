@@ -4,7 +4,7 @@ const userController = require('../controllers/userController');
 const checkAccessTokenValidity = require('../middleware/checkTokenValidity');
 
 
-router.get('/dashboard', checkAccessTokenValidity, userController.getDashboard);
-router.get('/feed', checkAccessTokenValidity, userController.getFeed);
+router.get('/dashboard', userController.getDashboard);
+router.get('/feed', userController.getFeed);
 
 module.exports = router;

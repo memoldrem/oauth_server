@@ -1,9 +1,10 @@
+const checkAccessTokenValidity = require('../middleware/checkTokenValidity');
 const { RefreshToken, AccessToken, AuthorizationCode } = require('../models');
 const crypto = require('crypto');
 
 
-exports.getCallback = async (req, res) => {
 
+exports.getCallback = async (req, res) => {
     const { code, state: queryState } = req.query;
     const stateCookie = req.cookies.state;
     const { state }  = JSON.parse(stateCookie);
@@ -12,7 +13,6 @@ exports.getCallback = async (req, res) => {
     if (state !== queryState) { // will this work?
         return res.status(400).send('Invalid state parameter');
     }
-    
 
     try {
         let authorizationCode;
@@ -75,3 +75,88 @@ exports.getCallback = async (req, res) => {
         return res.status(500).json({ error: 'Internal server error in GET callback' });
     }
 }
+
+exports.validate = async (req, res) => {
+    const { access_token } = req.body;  // Token sent from Flask server
+    const refresh_token = req.cookies.refresh_token;  
+
+    if (!access_token) {
+        return res.status(400).json({ error: 'Missing access token' });
+    }
+
+    try {
+ 
+        const storedToken = await AccessToken.findOne({
+            where: { access_token },
+            include: [
+                { model: Client, as: 'client' },
+                { model: User, as: 'user' },
+            ],
+        });
+
+        if (storedToken) {
+            if (storedToken.expires_at < Date.now()) {
+                console.log('Access token expired. Attempting to refresh...');
+
+                // Handle refresh token if available
+                if (!refresh_token) {
+                    return res.status(400).json({ error: 'No refresh token provided. Could not refresh.' });
+                }
+
+                const storedRefreshToken = await RefreshToken.findOne({
+                    where: { refresh_token },
+                });
+
+                if (!storedRefreshToken) {
+                    return res.status(400).json({ error: 'Invalid refresh token provided. Could not refresh.' });
+                }
+
+                if (storedRefreshToken.expires_at < Date.now()) {
+                    return res.status(401).json({ error: 'Refresh token expired. Please log in again.' });
+                }
+
+                // Generate a new access token
+                const newAccessToken = crypto.randomBytes(32).toString('hex');
+                const newAccessTokenExpiresAt = Date.now() + 60 * 60 * 1000;  // 1 hour
+
+                // Save the new access token
+                await AccessToken.create({
+                    access_token: newAccessToken,
+                    expires_at: newAccessTokenExpiresAt,
+                    user_id: storedRefreshToken.user_id,
+                    client_id: storedRefreshToken.client_id,
+                });
+
+                // Delete the old access token and clear the old cookie
+                await storedToken.destroy();
+                res.clearCookie('access_token');
+
+                // Send the new access token as a cookie and in the response body
+                res.cookie('access_token', newAccessToken, {
+                    httpOnly: true,
+                    secure: process.env.NODE_ENV === 'production',
+                    sameSite: 'Strict',
+                    maxAge: 3600000,  // 1 hour expiration
+                });
+
+                // Respond with user data and the new access token
+                return res.status(200).json({
+                    status: 'valid',
+                    user: { id: storedRefreshToken.user.id, username: storedRefreshToken.user.username },
+                    new_access_token: newAccessToken,
+                });
+            } else {
+                console.log('Access token is valid');
+                return res.status(200).json({
+                    status: 'valid',
+                    user: { id: storedToken.user.id, username: storedToken.user.username },
+                });
+            }
+        } else {
+            return res.status(401).json({ error: 'Invalid access token', message: 'Token does not exist in the database' });
+        }
+    } catch (error) {
+        console.error('Error validating access token:', error);
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+};
