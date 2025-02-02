@@ -14,3 +14,8 @@ router.post('/authorize', authorizeController.postAuthorize);
 router.post('/logout', loginController.logout);
 
 module.exports = router;
+
+
+
+
+
