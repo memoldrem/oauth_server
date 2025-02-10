@@ -10,4 +10,4 @@ exports.getFeed = async (req, res) => {
     const userDataCookie = req.cookies.user_data;
     const { firstName } = JSON.parse(userDataCookie);
     res.render('feed', { greeting: firstName,});
-}
+};

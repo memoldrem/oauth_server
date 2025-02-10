@@ -4,6 +4,22 @@ const initializePassport = require('../config/passport-config');
 initializePassport(passport); // Initialize passport strategies
 const crypto = require('crypto');
 
+/**
+ *  Author: Madeline Moldrem
+ *
+ *  Handles user authentication and session management:
+ *  - `getLogin`: Generates a CSRF token and renders the login page.
+ *  - `postLogin`: Validates the CSRF token, authenticates the user using Passport.js,
+ *                 sets cookies for session management, and redirects to the authorization process.
+ *  - `logout`: Clears authentication-related cookies, invalidates access/refresh tokens,
+ *              destroys the user session, and redirects to the login page.
+ *
+ *  The `state` parameter:
+ *  - Helps prevent CSRF attacks by ensuring authorization responses are tied to legitimate requests.
+ *  - Stores a randomly generated value in a cookie to be used during OAuth authorization.
+ */
+
+
 exports.getLogin = (req, res) => {
     const csrfToken = crypto.randomBytes(16).toString('hex')
     req.session.csrfToken = csrfToken;
@@ -32,11 +48,11 @@ exports.postLogin = (req, res, next) => {
                 return next(err);
             }
             try {
-                const userId = user.user_id
-                const firstName = user.first_name
+                const userId = user.user_id;
+                const firstName = user.first_name;
                 res.cookie('user_data', JSON.stringify({ userId, firstName }), {
                     httpOnly: true, // Cannot be accessed by JavaScript
-                    secure: process.env.NODE_ENV === 'production', // Only set secure cookies in production
+                    secure: process.env.NODE_ENV === 'prod', // Only set secure cookies in production
                     maxAge: 86400000, // Cookie expires in 1 day
                     sameSite: 'Strict', // Prevent CSRF attacks
                 });
@@ -52,9 +68,8 @@ exports.postLogin = (req, res, next) => {
                     return res.status(400).send('Invalid client configuration.');
                 }
 
-
-                const state = crypto.randomBytes(16).toString('hex'); 
-
+                // Generate a new state for CSRF protection during authorization
+                const state = crypto.randomBytes(16).toString('hex');
                 res.cookie('state', JSON.stringify({ state }), {
                     httpOnly: true, // Cannot be accessed by JavaScript
                     secure: process.env.NODE_ENV === 'production', // Only set secure cookies in production
@@ -71,7 +86,7 @@ exports.postLogin = (req, res, next) => {
             }
         });
     })(req, res, next);
-}
+};
 
 
 

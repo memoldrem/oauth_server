@@ -2,7 +2,25 @@ const checkAccessTokenValidity = require('../middleware/checkTokenValidity');
 const { RefreshToken, AccessToken, AuthorizationCode } = require('../models');
 const crypto = require('crypto');
 
+const fs = require('fs');
 
+const jwt = require('jsonwebtoken');
+
+/**
+ *  Author: Madeline Moldrem
+ *
+ *  Handles the OAuth 2.0 token exchange and validation:
+ *  - `getCallback`: Processes the OAuth callback, verifies the authorization code and state,
+ *                   generates access and refresh tokens, stores them, and redirects to the dashboard.
+ *  - `validate`: Validates the access token, checks its expiration, and issues a new token using
+ *                the refresh token if necessary.
+ *
+ *  The `state` parameter:
+ *  - Prevents CSRF attacks by ensuring the response is linked to the original request.
+ *  - Stored in cookies and compared with the received query parameter before proceeding.
+ */
+
+const privateKey = fs.readFileSync(process.env.JWT_PRIVATE_KEY_PATH, 'utf8');
 
 exports.getCallback = async (req, res) => {
     const { code, state: queryState } = req.query;
@@ -15,22 +33,25 @@ exports.getCallback = async (req, res) => {
     }
 
     try {
-        let authorizationCode;
-        for (let attempt = 0; attempt < 3; attempt++) { // needed this because timing kept messing up???
-            authorizationCode = await AuthorizationCode.findOne({
-                where: { authorization_code: code },
-            });
-            if (authorizationCode) { break; } else {
-                console.log('Authorization code not found, retrying...');
-                await new Promise(resolve => setTimeout(resolve, 100)); // wait 100ms
-            }
-        }
-
+        const authorizationCode = await findAuthorizationCode(code);
         if (!authorizationCode) { return res.status(400).json({ error: 'No auth code found in database' });
         } else if (authorizationCode.expires_at < Date.now()) { return res.status(400).json({ error: 'Expired auth code' });}
 
+
+        /**
+         *  Creating the JWT payload with the logged-in user's details (e.g., user_id and client_id).
+         *  This allows downstream microservices to extract user information directly from the token,
+         *  eliminating the need for extra database lookups.*
+         */
+
+        const payload = {
+            user_id: authorizationCode.user_id,
+            client_id: authorizationCode.client_id
+            // You can add other claims as needed.
+        };
+
         // access token
-        const accessToken = crypto.randomBytes(32).toString('hex');
+        const accessToken = jwt.sign(payload, privateKey, { algorithm: 'ES256', expiresIn: '1h' });
         const accessTokenExpiresAt = Date.now() + 60 * 60 * 1000;  // Access token expires in 1 hour
   
           // refresh token
@@ -55,26 +76,40 @@ exports.getCallback = async (req, res) => {
 
         res.cookie('access_token', accessToken, {
             httpOnly: true,  // Prevent JavaScript access
-            secure: process.env.NODE_ENV === 'production',  // Send over HTTPS in production
+            secure: process.env.NODE_ENV === 'prod',  // Send over HTTPS in production
             sameSite: 'Strict',  // Prevent CSRF
             maxAge: 3600000,  // 1 hour expiration
         });
 
         res.cookie('refresh_token', refreshToken, {
             httpOnly: true,  
-            secure: process.env.NODE_ENV === 'production',  
+            secure: process.env.NODE_ENV === 'prod',
             sameSite: 'Strict', 
             maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days expiration
         });
 
         await AuthorizationCode.destroy({ where: { authorization_code: code } })
-        res.redirect('dashboard');
-        // res.redirect(`dashboard?access_token=${accessToken}&state=${queryState}`); 
+
+        // Retrieve the client record to access the landing_page field.
+        const client = await Client.findOne({ where: { client_id: authorizationCode.client_id } });
+        const finalLandingPage = client.landing_page || client.redirect_uri;
+
+        // Redirect the user to the client’s landing page.
+        res.redirect(finalLandingPage);
     } catch (error) {
         console.error('Error processing callback:', error);
         return res.status(500).json({ error: 'Internal server error in GET callback' });
     }
 }
+
+const findAuthorizationCode = async (code, attempts = 3, delay = 100) => {
+    const result = await AuthorizationCode.findOne({ where: { authorization_code: code } });
+    if (result) return result;
+    if (attempts <= 1) return null;
+    console.log('Authorization code not found, retrying...');
+    await new Promise(resolve => setTimeout(resolve, delay));
+    return findAuthorizationCode(code, attempts - 1, delay);
+};
 
 // exports.validate = async (req, res) => {
 //     const { access_token } = req.body;  // Token sent from Flask server
@@ -171,4 +206,4 @@ exports.validate = (req, res) => {
 
   res.status(401).send({ message: 'Invalid or expired token' });
 
-}
+};

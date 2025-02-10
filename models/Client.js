@@ -8,6 +8,7 @@ module.exports = (sequelize, DataTypes) => {
       client_secret: { type: DataTypes.STRING, allowNull: false },
       client_name: { type: DataTypes.STRING, allowNull: false },
       redirect_uri: { type: DataTypes.STRING, allowNull: false },
+      landing_page: { type: DataTypes.STRING, allowNull: true },
       owner_id: { type: DataTypes.INTEGER, allowNull: false },
   }, {
     timestamps: true, // Enable Sequelize timestamps
