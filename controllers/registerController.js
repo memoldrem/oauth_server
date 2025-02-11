@@ -2,6 +2,18 @@ const bcrypt = require('bcrypt');
 const crypto = require('crypto');
 const { User, Client } = require('../models');
 
+/**
+ *  Author: Madeline Moldrem
+ *
+ *  Handles user registration with CSRF protection:
+ *  - Generates a CSRF token when the registration page is accessed.
+ *  - Validates the CSRF token upon form submission.
+ *  - Checks for existing users by username and email.
+ *  - Hashes the password and stores the new user in the database.
+ *  - Creates a default client entry for the user.
+ */
+
+
 exports.getRegister = (req, res) => {
     
     const csrfToken = crypto.randomBytes(16).toString('hex')
@@ -57,6 +69,7 @@ exports.postRegister = async (req, res) => {
             client_secret: crypto.randomBytes(16).toString('hex'),
             client_name: `d${newUser.user_id}`, // d for default, the user id
             redirect_uri: '/callback',
+            landing_page: 'dashboard', // TODO: In the future, allow this to be customized to the application's landing page.
             owner_id: newUser.user_id,
         });
 
