@@ -1,5 +1,5 @@
 const checkAccessTokenValidity = require('../middleware/checkTokenValidity');
-const { RefreshToken, AccessToken, AuthorizationCode } = require('../models');
+const { RefreshToken, AccessToken, AuthorizationCode, Client } = require('../models');
 const crypto = require('crypto');
 
 const fs = require('fs');
@@ -44,10 +44,29 @@ exports.getCallback = async (req, res) => {
          *  eliminating the need for extra database lookups.*
          */
 
+
+
+        let role;
+        let email;
+        try {
+            role = req.cookies['user_data'] ? JSON.parse(req.cookies['user_data']).role : null;
+            email = req.cookies['user_data'] ? JSON.parse(req.cookies['user_data']).email: null;
+        } catch (error) {
+            console.error('Error parsing user_data cookie:', error);
+            role = null;  // Fallback to null or a default role, like 'user'
+            email = null;
+        }
+        
+        // If role is required and is still null, you might want to handle that case explicitly
+        if (!role || !email) {
+            return res.status(400).json({ error: 'User role not found in cookie' });
+        }
+        
         const payload = {
             user_id: authorizationCode.user_id,
-            client_id: authorizationCode.client_id
-            // You can add other claims as needed.
+            client_id: authorizationCode.client_id,
+            email: email,
+            role: role,  // Now safely assigned
         };
 
         // access token

@@ -1,6 +1,6 @@
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
-const { User, Client } = require('../models');
+const { User, Client,  } = require('../models');
 
 /**
  *  Author: Madeline Moldrem
