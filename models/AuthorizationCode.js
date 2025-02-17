@@ -9,7 +9,7 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.INTEGER,
             allowNull: false,
             references: {
-                model: 'Users', // Name of the Users table
+                model: 'Users',
                 key: 'user_id',
             },
             onUpdate: 'CASCADE',
@@ -19,7 +19,7 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.INTEGER,
             allowNull: false,
             references: {
-                model: 'Clients', // Name of the Clients table
+                model: 'Clients',
                 key: 'client_id',
             },
             onUpdate: 'CASCADE',
@@ -37,6 +37,9 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.STRING,
             allowNull: false,
         },
+    }, {
+        tableName: 'authorization_codes',
+        timestamps: true,
     });
 
     AuthorizationCode.associate = (models) => {

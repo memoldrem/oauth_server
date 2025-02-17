@@ -1,4 +1,4 @@
-const { User, Client, AuthorizationCode, RefreshToken, AccessToken } = require('../models');
+const { User, Client, AuthorizationCode, UserClientConsent } = require('../models');
 const crypto = require('crypto');
 
 /**
