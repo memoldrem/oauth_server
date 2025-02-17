@@ -38,7 +38,7 @@ module.exports = {
         allowNull: false,
       },
       client_id: {
-        type: Sequelize.STRING,  // Note: If your Clients table uses an integer for client_id, consider using INTEGER here.
+        type: Sequelize.INTEGER,  // Note: If your Clients table uses an integer for client_id, consider using INTEGER here.
         allowNull: false,
       },
       createdAt: {
