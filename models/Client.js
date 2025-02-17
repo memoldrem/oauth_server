@@ -11,8 +11,9 @@ module.exports = (sequelize, DataTypes) => {
       landing_page: { type: DataTypes.STRING, allowNull: true },
       owner_id: { type: DataTypes.INTEGER, allowNull: false },
   }, {
-    timestamps: true, // Enable Sequelize timestamps
-});
+      tableName: 'clients',
+      timestamps: true,
+  });
 
   Client.associate = (models) => {
       Client.belongsTo(models.User, { foreignKey: 'owner_id', as: 'owner' });

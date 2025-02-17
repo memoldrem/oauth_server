@@ -4,8 +4,9 @@ module.exports = (sequelize, DataTypes) => {
         user_id: { type: DataTypes.INTEGER, allowNull: false },
         client_id: { type: DataTypes.INTEGER, allowNull: false },
         expires_at: { type: DataTypes.DATE, allowNull: false },
-    }, { 
-        timestamps: true, 
+    }, {
+        tableName: 'access_tokens',
+        timestamps: true,
     });
   
     AccessToken.associate = (models) => {

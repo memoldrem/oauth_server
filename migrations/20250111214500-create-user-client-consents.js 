@@ -1,0 +1,50 @@
+'use strict';
+/**
+ * Author: Madeline Moldrem
+ *
+ * This migration creates the "UserClientConsents" table with the following columns:
+ * - id: Primary key, auto-increment integer.
+ * - user_id: An integer (not null) representing the ID of the user.
+ * - client_id: An integer (not null) representing the ID of the client.
+ * - consent_granted: A boolean indicating if consent has been granted (default is false).
+ * - createdAt/updatedAt: Timestamps automatically managed by Sequelize.
+ */
+module.exports = {
+  up: async (queryInterface, Sequelize) => {
+    await queryInterface.createTable('user_client_consents', {
+      id: {
+        type: Sequelize.INTEGER,
+        allowNull: false,
+        autoIncrement: true,
+        primaryKey: true,
+      },
+      user_id: {
+        type: Sequelize.INTEGER,
+        allowNull: false,
+      },
+      client_id: {
+        type: Sequelize.INTEGER,
+        allowNull: false,
+      },
+      consent_granted: {
+        type: Sequelize.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+      },
+      createdAt: {
+        allowNull: false,
+        type: Sequelize.DATE,
+        defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
+      },
+      updatedAt: {
+        allowNull: false,
+        type: Sequelize.DATE,
+        defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
+      },
+    });
+  },
+
+  down: async (queryInterface, Sequelize) => {
+    await queryInterface.dropTable('user_client_consents');
+  },
+};
