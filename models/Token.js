@@ -11,6 +11,7 @@ module.exports = (sequelize, DataTypes) => {
       user_id: { type: DataTypes.INTEGER, allowNull: false },
       client_id: { type: DataTypes.STRING, allowNull: false },
     }, {
+      tableName: 'tokens',
       timestamps: true, // Enable Sequelize timestamps
   });
 

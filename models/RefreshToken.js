@@ -5,7 +5,8 @@ module.exports = (sequelize, DataTypes) => {
         client_id: { type: DataTypes.INTEGER, allowNull: false },
         expires_at: { type: DataTypes.DATE, allowNull: false },
         is_revoked: { type: DataTypes.BOOLEAN, defaultValue: false },
-    }, { 
+    }, {
+        tableName: 'refresh_tokens',
         timestamps: true, 
     });
 

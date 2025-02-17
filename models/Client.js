@@ -11,7 +11,8 @@ module.exports = (sequelize, DataTypes) => {
       landing_page: { type: DataTypes.STRING, allowNull: true },
       owner_id: { type: DataTypes.INTEGER, allowNull: false },
   }, {
-    timestamps: true, // Enable Sequelize timestamps
+      tableName: 'clients',
+      timestamps: true, // Enable Sequelize timestamps
 });
 
   Client.associate = (models) => {

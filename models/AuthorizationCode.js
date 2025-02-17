@@ -37,6 +37,9 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.STRING,
             allowNull: false,
         },
+    }, {
+        tableName: 'authorization_codes',
+        timestamps: true,
     });
 
     AuthorizationCode.associate = (models) => {

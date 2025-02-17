@@ -1,37 +1,59 @@
 'use strict';
-/** @type {import('sequelize-cli').Migration} */
+/**
+ * Author: Madeline Moldrem
+ *
+ * This migration creates the Clients table with the following columns:
+ * - client_id: Primary key, auto-increment integer.
+ * - client_secret: A string (not null) that stores the client's secret.
+ * - client_name: A string (not null) that stores the client's name.
+ * - redirect_uri: A string (not null) for the client's redirect URI.
+ * - landing_page: An optional string for the client's landing page.
+ * - owner_id: An integer (not null) that references the user who owns this client.
+ * - createdAt/updatedAt: Timestamps automatically managed by Sequelize.
+ */
 module.exports = {
-  async up(queryInterface, Sequelize) {
-    await queryInterface.createTable('Clients', {
-      id: {
+  up: async (queryInterface, Sequelize) => {
+    await queryInterface.createTable('clients', {
+      client_id: {
+        type: Sequelize.INTEGER,
         allowNull: false,
         autoIncrement: true,
-        primaryKey: true,
-        type: Sequelize.INTEGER
+        primaryKey: true
       },
-      clientID: {
-        type: Sequelize.INTEGER
+      client_secret: {
+        type: Sequelize.STRING,
+        allowNull: false,
       },
-      clientSecret: {
-        type: Sequelize.STRING
+      client_name: {
+        type: Sequelize.STRING,
+        allowNull: false,
       },
-      redirectURI: {
-        type: Sequelize.STRING
+      redirect_uri: {
+        type: Sequelize.STRING,
+        allowNull: false,
       },
-      ownerID: {
-        type: Sequelize.INTEGER
+      landing_page: {
+        type: Sequelize.STRING,
+        allowNull: true,
+      },
+      owner_id: {
+        type: Sequelize.INTEGER,
+        allowNull: false,
       },
       createdAt: {
         allowNull: false,
-        type: Sequelize.DATE
+        type: Sequelize.DATE,
+        defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
       },
       updatedAt: {
         allowNull: false,
-        type: Sequelize.DATE
+        type: Sequelize.DATE,
+        defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
       }
     });
   },
-  async down(queryInterface, Sequelize) {
-    await queryInterface.dropTable('Clients');
+
+  down: async (queryInterface, Sequelize) => {
+    await queryInterface.dropTable('clients');
   }
 };

@@ -1,4 +1,4 @@
-const { User, Client, AuthorizationCode, RefreshToken, AccessToken } = require('../models');
+const { User, Client, AuthorizationCode, UserClientConsent } = require('../models');
 const crypto = require('crypto');
 
 /**
@@ -57,6 +57,7 @@ exports.getAuthorize = async (req, res) => {
     } else {
         // Otherwise, render the consent page so the user can approve or deny access
         res.render('authorize', { client_id, redirect_uri, state });
+
     }
 };
 

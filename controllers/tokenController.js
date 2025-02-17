@@ -2,6 +2,8 @@ const checkAccessTokenValidity = require('../middleware/checkTokenValidity');
 const { RefreshToken, AccessToken, AuthorizationCode } = require('../models');
 const crypto = require('crypto');
 
+const {Client } = require('../models');
+
 const fs = require('fs');
 
 const jwt = require('jsonwebtoken');
