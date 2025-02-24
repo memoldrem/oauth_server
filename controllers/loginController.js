@@ -50,7 +50,9 @@ exports.postLogin = (req, res, next) => {
             try {
                 const userId = user.user_id;
                 const firstName = user.first_name;
-                res.cookie('user_data', JSON.stringify({ userId, firstName }), {
+                const role = user.role; // these were added
+                const email = user.email;
+                res.cookie('user_data', JSON.stringify({ userId, firstName, role, email }), {
                     httpOnly: true, // Cannot be accessed by JavaScript
                     secure: process.env.NODE_ENV === 'prod', // Only set secure cookies in production
                     maxAge: 86400000, // Cookie expires in 1 day
@@ -71,10 +73,10 @@ exports.postLogin = (req, res, next) => {
                 // Generate a new state for CSRF protection during authorization
                 const state = crypto.randomBytes(16).toString('hex');
                 res.cookie('state', JSON.stringify({ state }), {
-                    httpOnly: true, // Cannot be accessed by JavaScript
-                    secure: process.env.NODE_ENV === 'production', // Only set secure cookies in production
+                    httpOnly: true, 
+                    secure: process.env.NODE_ENV === 'production', 
                     maxAge: 86400000, // Cookie expires in 1 day
-                    sameSite: 'Strict', // Prevent CSRF attacks
+                    sameSite: 'Strict', 
                 });
 
                 const redirectUrl = `/authorize?client_id=${client.client_id}&redirect_uri=${encodeURIComponent(client.redirect_uri)}&state=${state}`;

@@ -1,5 +1,5 @@
 const checkAccessTokenValidity = require('../middleware/checkTokenValidity');
-const { RefreshToken, AccessToken, AuthorizationCode } = require('../models');
+const { RefreshToken, AccessToken, AuthorizationCode, Client } = require('../models');
 const crypto = require('crypto');
 
 const fs = require('fs');
@@ -44,10 +44,29 @@ exports.getCallback = async (req, res) => {
          *  eliminating the need for extra database lookups.*
          */
 
+
+
+        let role;
+        let email;
+        try {
+            role = req.cookies['user_data'] ? JSON.parse(req.cookies['user_data']).role : null;
+            email = req.cookies['user_data'] ? JSON.parse(req.cookies['user_data']).email: null;
+        } catch (error) {
+            console.error('Error parsing user_data cookie:', error);
+            role = null;  // Fallback to null or a default role, like 'user'
+            email = null;
+        }
+        
+        // If role is required and is still null, you might want to handle that case explicitly
+        if (!role || !email) {
+            return res.status(400).json({ error: 'User role not found in cookie' });
+        }
+        
         const payload = {
             user_id: authorizationCode.user_id,
-            client_id: authorizationCode.client_id
-            // You can add other claims as needed.
+            client_id: authorizationCode.client_id,
+            email: email,
+            role: role,  // Now safely assigned
         };
 
         // access token
@@ -112,7 +131,7 @@ const findAuthorizationCode = async (code, attempts = 3, delay = 100) => {
 };
 
 // exports.validate = async (req, res) => {
-//     const { access_token } = req.body;  // Token sent from Flask server
+//     const { access_token } = req.body; 
 //     const refresh_token = req.cookies.refresh_token;  
 
 //     if (!access_token) {
@@ -150,7 +169,7 @@ const findAuthorizationCode = async (code, attempts = 3, delay = 100) => {
 //                     return res.status(401).json({ error: 'Refresh token expired. Please log in again.' });
 //                 }
 
-//                 // Generate a new access token
+//              
 //                 const newAccessToken = crypto.randomBytes(32).toString('hex');
 //                 const newAccessTokenExpiresAt = Date.now() + 60 * 60 * 1000;  // 1 hour
 
@@ -199,10 +218,11 @@ const findAuthorizationCode = async (code, attempts = 3, delay = 100) => {
 exports.validate = (req, res) => {
     const token = req.body.access_token;
   
-  // Validate the token (this is a mock validation; adjust based on your logic)
+  //  this is just temporary
   if (token === "valid-token") {
     return res.status(200).send({ message: 'Token is valid' });
   }
+  console.log(token)
 
   res.status(401).send({ message: 'Invalid or expired token' });
 
