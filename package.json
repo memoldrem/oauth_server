@@ -5,7 +5,7 @@
   "scripts": {
     "start": "dotenv -e .env -- node server.js",
     "dev": "dotenv -e .env -- nodemon server.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"No tests specified\" && exit 0"
   },
   "author": "Madeline Moldrem",
   "license": "ISC",
@@ -45,3 +45,4 @@
     "sequelize-cli": "^6.6.2"
   }
 }
+

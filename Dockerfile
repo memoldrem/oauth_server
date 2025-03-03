@@ -1,19 +1,31 @@
-# Author: Madeline Moldrem
+FROM node:18
 
-FROM node:16
-
-# Set the working directory inside the container
 WORKDIR /usr/src/app
 
-# Copy package files and install production dependencies
 COPY package*.json ./
-RUN npm install --only=production
+RUN npm config set registry https://registry.npmjs.org/ && \
+    npm config set fetch-timeout 60000 && \
+    npm cache clean --force && \
+    npm install --only=production
 
-# Copy the remainder of the application code
+
+# Copy all project files
 COPY . .
 
-# Expose the application port
+# Automatically make all .sh files executable
+RUN find . -type f -name "*.sh" -exec chmod +x {} \;
+
+# Install AWS CLI (example for Debian/Ubuntu-based images)
+RUN apt-get update && apt-get install -y unzip curl && \
+    curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
+    unzip awscliv2.zip && \
+    ./aws/install && \
+    rm -rf aws awscliv2.zip && \
+    rm -rf /var/lib/apt/lists/*
+
+
 EXPOSE 3001
 
-# Start the application
-CMD ["npm", "start"]
+ENTRYPOINT ["./build.sh"]
+
+
