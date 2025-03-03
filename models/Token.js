@@ -9,9 +9,10 @@ module.exports = (sequelize, DataTypes) => {
       refresh_token: { type: DataTypes.STRING, unique: true, },
       expires_at: { type: DataTypes.DATE, allowNull: false },
       user_id: { type: DataTypes.INTEGER, allowNull: false },
-      client_id: { type: DataTypes.STRING, allowNull: false },
+      client_id: { type: DataTypes.INTEGER, allowNull: false },
     }, {
-      timestamps: true, // Enable Sequelize timestamps
+      tableName: 'tokens',
+      timestamps: true,
   });
 
   Token.associate = (models) => {

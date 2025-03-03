@@ -14,6 +14,7 @@ module.exports = (sequelize, DataTypes) => {
             defaultValue: false
         }
     }, {
+        tableName: 'user_client_consents',
         timestamps: true
     });
 
