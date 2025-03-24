@@ -1,5 +1,5 @@
 const checkAccessTokenValidity = require('../middleware/checkTokenValidity');
-const { RefreshToken, AccessToken, AuthorizationCode } = require('../models');
+const { RefreshToken, AccessToken, AuthorizationCode, Client, User } = require('../models');
 const crypto = require('crypto');
 
 
@@ -69,7 +69,6 @@ exports.getCallback = async (req, res) => {
 
         await AuthorizationCode.destroy({ where: { authorization_code: code } })
         res.redirect('dashboard');
-        // res.redirect(`dashboard?access_token=${accessToken}&state=${queryState}`); 
     } catch (error) {
         console.error('Error processing callback:', error);
         return res.status(500).json({ error: 'Internal server error in GET callback' });
@@ -77,12 +76,14 @@ exports.getCallback = async (req, res) => {
 }
 
 // exports.validate = async (req, res) => {
+//     console.log('Validating access token...');
 //     const { access_token } = req.body;  // Token sent from Flask server
 //     const refresh_token = req.cookies.refresh_token;  
 
 //     if (!access_token) {
 //         return res.status(400).json({ error: 'Missing access token' });
 //     }
+//     console.log('1.');
 
 //     try {
  
@@ -94,7 +95,9 @@ exports.getCallback = async (req, res) => {
 //             ],
 //         });
 
+//         console.log('2.');
 //         if (storedToken) {
+//             console.log(storedToken.expires_at);
 //             if (storedToken.expires_at < Date.now()) {
 //                 console.log('Access token expired. Attempting to refresh...');
 
@@ -142,6 +145,7 @@ exports.getCallback = async (req, res) => {
 //                 // Respond with user data and the new access token
 //                 return res.status(200).json({
 //                     status: 'valid',
+//                     oken: newAccessToken,
 //                     user: { id: storedRefreshToken.user.id, username: storedRefreshToken.user.username },
 //                     new_access_token: newAccessToken,
 //                 });
@@ -149,6 +153,7 @@ exports.getCallback = async (req, res) => {
 //                 console.log('Access token is valid');
 //                 return res.status(200).json({
 //                     status: 'valid',
+//                     token: access_token,
 //                     user: { id: storedToken.user.id, username: storedToken.user.username },
 //                 });
 //             }
@@ -165,8 +170,8 @@ exports.validate = (req, res) => {
     const token = req.body.access_token;
   
   // Validate the token (this is a mock validation; adjust based on your logic)
-  if (token === "valid-token") {
-    return res.status(200).send({ message: 'Token is valid' });
+  if (token) {
+    return res.status(200).send({ token: token });
   }
 
   res.status(401).send({ message: 'Invalid or expired token' });
